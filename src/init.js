@@ -14,7 +14,8 @@ const postsList = document.querySelector('.posts-group');
 const modalBody = document.querySelector('.modal-body');
 const modalCancel = document.querySelector('.modal-cancel');
 const modalTitle = document.querySelector('.modal-title');
-const getRssListData = () => Array.prototype.slice.call(document.querySelectorAll('.rss-flow')).map((el) => el.name);
+const getSelectorItems = (selector, prop) => Array.prototype.slice
+  .call(document.querySelectorAll(selector)).map((el) => el[prop]);
 const domparser = new DOMParser();
 const getXmlContent = xmlFile => domparser.parseFromString(xmlFile.request.responseText, 'text/xml');
 const getTitleData = xmlData => xmlData.querySelector('title').textContent;
@@ -24,10 +25,10 @@ const buildProxyPath = path => `https://cors-anywhere.herokuapp.com/${path}`;
 
 export default () => {
   const state = {
-    inputValue: '',
     expectedNewValue: false,
     expectedModal: false,
     valid: true,
+    inputValue: '',
     currentPost: '',
     amountElements: 0,
   };
@@ -38,16 +39,19 @@ export default () => {
       inputRss.setAttribute('class', 'form-control is-invalid');
     }
     if (state.expectedModal) {
-      const currentPostElement = postsList.querySelector(`#${state.currentPost}`).parentElement;
-      const currentPostDescription = currentPostElement.querySelector('.post-description').textContent;
-      const currentPostTitle = currentPostElement.querySelector('.post-title').textContent;
-      modalTitle.textContent = currentPostTitle;
-      modalBody.textContent = currentPostDescription;
+      const postTitleList = postsList.querySelectorAll('.post-title');
+      postTitleList.forEach(title => {
+        if (title.textContent === state.currentPost) {
+          const currentPostDescription = title.parentElement.parentElement;
+          modalTitle.textContent = title.textContent;
+          modalBody.textContent = currentPostDescription.querySelector('.post-description').textContent;
+        }
+      });
     }
     if (state.expectedNewValue) {
       axios.get(buildProxyPath(state.inputValue))
-        .then(e => {
-          const xmlContent = getXmlContent(e);
+        .then(rssPath => {
+          const xmlContent = getXmlContent(rssPath);
           const rssFlowElement = document.createElement('a');
           const rssFlowTitleContainer = document.createElement('div');
           const rssFlowTitle = document.createElement('h5');
@@ -65,38 +69,48 @@ export default () => {
           rssFlowElement.append(rssFlowTitleContainer, rssFlowDescription);
           rssFlowList.append(rssFlowElement);
 
-          const rssPosts = getRssPosts(xmlContent);
-          rssPosts.forEach((post, i) => {
-            const rssPostElement = document.createElement('a');
-            const rssPostTitleContainer = document.createElement('div');
-            const rssPostTitle = document.createElement('h5');
-            const rssPostButton = document.createElement('button');
-            const rssPostDescription = document.createElement('p');
+          const addP = (posts) => {
+            posts.forEach((post) => {
+              const currPosts = getSelectorItems('.post-title', 'textContent');
+              if (!isIn(getTitleData(post), currPosts)) {
+                const rssPostElement = document.createElement('a');
+                const rssPostTitleContainer = document.createElement('div');
+                const rssPostTitle = document.createElement('h5');
+                const rssPostButton = document.createElement('button');
+                const rssPostDescription = document.createElement('p');
 
-            rssPostElement.setAttribute('class', 'list-group-item list-group-item-action flex-column');
-            rssPostTitleContainer.setAttribute('class', 'd-flex w-100');
-            rssPostTitle.setAttribute('class', 'mb-1 post-title');
-            rssPostButton.setAttribute('class', 'btn btn-primary');
-            rssPostButton.setAttribute('id', `post-${state.amountElements}${i}`);
-            rssPostButton.setAttribute('data-toggle', 'modal');
-            rssPostButton.setAttribute('data-target', '#exampleModal');
-            rssPostDescription.setAttribute('class', 'mb-1 d-none post-description');
+                rssPostElement.setAttribute('class', 'list-group-item list-group-item-action flex-column');
+                rssPostTitleContainer.setAttribute('class', 'd-flex w-100');
+                rssPostTitle.setAttribute('class', 'mb-1 post-title');
+                rssPostButton.setAttribute('class', 'btn btn-primary');
+                rssPostButton.setAttribute('data-toggle', 'modal');
+                rssPostButton.setAttribute('data-target', '#exampleModal');
+                rssPostDescription.setAttribute('class', 'mb-1 d-none post-description');
+                rssPostTitle.textContent = getTitleData(post);
+                rssPostButton.textContent = 'More';
+                rssPostDescription.textContent = getDescriptionData(post);
 
-            rssPostTitle.textContent = getTitleData(post);
-            rssPostButton.textContent = 'More';
-            rssPostDescription.textContent = getDescriptionData(post);
-
-            rssPostTitleContainer.append(rssPostTitle);
-            rssPostElement.append(rssPostTitleContainer, rssPostButton, rssPostDescription);
-            postsList.append(rssPostElement);
-          });
+                rssPostTitleContainer.append(rssPostTitle);
+                rssPostElement.append(rssPostTitleContainer, rssPostButton, rssPostDescription);
+                postsList.append(rssPostElement);
+              }
+            });
+          };
+          setInterval(() => {
+            const rssListData = getSelectorItems('.rss-flow', 'name');
+            rssListData.map(rssItem => axios.get(buildProxyPath(rssItem)).then(listeningPath => {
+              const listeningXmlContent = getXmlContent(listeningPath);
+              const rssPosts = getRssPosts(listeningXmlContent);
+              addP(rssPosts);
+            }).catch(error => console.log(error)));
+          }, 6000);
         }).catch(error => console.log(error));
       inputRss.value = '';
     }
   });
 
   const submitValue = () => {
-    const rssListData = getRssListData();
+    const rssListData = getSelectorItems('.rss-flow', 'name');
     if (!state.expectedNewValue) {
       if (isIn(state.inputValue.trim(), rssListData) || !isURL(state.inputValue)) {
         state.valid = false;
@@ -117,7 +131,7 @@ export default () => {
     if (target.hasAttribute('data-toggle')) {
       state.expectedModal = true;
       state.expectedNewValue = false;
-      state.currentPost = target.getAttribute('id');
+      state.currentPost = target.parentElement.querySelector('.post-title').textContent;
     }
   });
   modalCancel.addEventListener('click', () => {
