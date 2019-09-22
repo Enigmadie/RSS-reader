@@ -1,146 +1,188 @@
 import '@babel/polyfill';
 import 'bootstrap/js/dist/modal';
-import 'bootstrap/js/dist/alert';
-import 'bootstrap/js/dist/util';
+//import 'bootstrap/js/dist/alert';
+//import 'bootstrap/js/dist/util';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { isURL, isIn } from 'validator';
 import { watch } from 'melanke-watchjs';
 import axios from 'axios';
 
-const inputRss = document.querySelector('.form-control');
-const submitRss = document.querySelector('.btn');
-const rssFlowList = document.querySelector('.rss-flow-group');
-const postsList = document.querySelector('.posts-group');
-const modalBody = document.querySelector('.modal-body');
-const modalCancel = document.querySelector('.modal-cancel');
-const modalTitle = document.querySelector('.modal-title');
-const getSelectorItems = (selector, prop) => Array.prototype.slice
-  .call(document.querySelectorAll(selector)).map((el) => el[prop]);
 const domparser = new DOMParser();
+const inputRssElement = document.querySelector('.form-control');
+const submitRssElement = document.querySelector('.btn');
+const rssListContainter = document.querySelector('.rss-flow-group');
+const postListContainer = document.querySelector('.posts-group');
+const modalFadeElement = document.querySelector('.fade');
+const modalBodyElement = document.querySelector('.modal-body');
+const modalTitleElement = document.querySelector('.modal-title');
+
+const getSelectorContentItems = (selector, prop = 'textContent', dataProp = null) => Array.prototype
+  .slice
+  .call(document.querySelectorAll(selector))
+  .map(el => (prop === 'data') ?  el.dataset[dataProp] : el[prop]);
+const getSelectorContent = (el, selector, prop = 'textContent') => el.querySelector(selector)[prop];
+const getSelectorItems = (el, selector) => el.querySelectorAll(selector);
 const getXmlContent = xmlFile => domparser.parseFromString(xmlFile.request.responseText, 'text/xml');
-const getTitleData = xmlData => xmlData.querySelector('title').textContent;
-const getDescriptionData = xmlData => xmlData.querySelector('description').textContent;
-const getRssPosts = xmlData => xmlData.querySelectorAll('item');
-const buildProxyPath = path => `https://cors-anywhere.herokuapp.com/${path}`;
+const buildPath = path => `https://cors-anywhere.herokuapp.com/${path}`;
 
 export default () => {
   const state = {
     expectedNewValue: false,
     expectedModal: false,
+    expectedActiveItem: false,
     valid: true,
     inputValue: '',
     currentPost: '',
-    amountElements: 0,
+    activeRssId: 0,
   };
 
   watch(state, ['expectedNewValue', 'expectedModal', 'valid'], () => {
-    inputRss.setAttribute('class', 'form-control');
+    inputRssElement.setAttribute('class', 'form-control');
     if (!state.valid) {
-      inputRss.setAttribute('class', 'form-control is-invalid');
+      inputRssElement.setAttribute('class', 'form-control is-invalid');
     }
     if (state.expectedModal) {
-      const postTitleList = postsList.querySelectorAll('.post-title');
+      const postTitleList = getSelectorItems(postListContainer, '.post-title');
       postTitleList.forEach(title => {
         if (title.textContent === state.currentPost) {
-          const currentPostDescription = title.parentElement.parentElement;
-          modalTitle.textContent = title.textContent;
-          modalBody.textContent = currentPostDescription.querySelector('.post-description').textContent;
+          const modalPostDescription = title.parentElement.parentElement;
+          const modalBodyContent = getSelectorContent(modalPostDescription, '.post-description');
+          modalTitleElement.textContent = title.textContent;
+          modalBodyElement.textContent = modalBodyContent;
         }
       });
     }
     if (state.expectedNewValue) {
-      axios.get(buildProxyPath(state.inputValue))
-        .then(rssPath => {
-          const xmlContent = getXmlContent(rssPath);
-          const rssFlowElement = document.createElement('a');
+      const currentPath = buildPath(state.inputValue);
+      axios.get(currentPath)
+        .then(xmlFile => {
+          const xmlContent = getXmlContent(xmlFile);
+          const rssFlowContainer = document.createElement('a');
           const rssFlowTitleContainer = document.createElement('div');
-          const rssFlowTitle = document.createElement('h5');
-          const rssFlowDescription = document.createElement('p');
+          const rssFlowTitleElement = document.createElement('h5');
+          const rssFlowDescriptionElement = document.createElement('p');
 
-          rssFlowElement.setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
-          rssFlowElement.setAttribute('name', state.inputValue);
+          const rssFlowTitleContent = getSelectorContent(xmlContent, 'title');
+          const rssFlowDescriptionContent = getSelectorContent(xmlContent, 'description');
+
+          rssFlowContainer.setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
+          rssFlowContainer.setAttribute('data-path', currentPath);
           rssFlowTitleContainer.setAttribute('class', 'd-flex w-100');
-          rssFlowTitle.setAttribute('class', 'mb-1');
-          rssFlowDescription.setAttribute('class', 'mb-1');
-          rssFlowTitle.textContent = getTitleData(xmlContent);
-          rssFlowDescription.textContent = getDescriptionData(xmlContent);
+          rssFlowTitleElement.setAttribute('class', 'mb-1');
+          rssFlowDescriptionElement.setAttribute('class', 'mb-1');
 
-          rssFlowTitleContainer.append(rssFlowTitle);
-          rssFlowElement.append(rssFlowTitleContainer, rssFlowDescription);
-          rssFlowList.append(rssFlowElement);
+          rssFlowTitleElement.textContent = rssFlowTitleContent;
+          rssFlowDescriptionElement.textContent = rssFlowDescriptionContent;
 
-          const addP = (posts) => {
-            posts.forEach((post) => {
-              const currPosts = getSelectorItems('.post-title', 'textContent');
-              if (!isIn(getTitleData(post), currPosts)) {
-                const rssPostElement = document.createElement('a');
+          rssFlowTitleContainer.append(rssFlowTitleElement);
+          rssFlowContainer.append(rssFlowTitleContainer, rssFlowDescriptionElement);
+          rssListContainter.append(rssFlowContainer);
+
+          const addPosts = (posts, id) => {
+            posts.forEach(post => {
+              const uploadedPosts = getSelectorContentItems('.post-title');
+              const postTitleContent = getSelectorContent(post, 'title');
+              const postDescriptionContent = getSelectorContent(post, 'description');
+
+              if (!isIn(postTitleContent, uploadedPosts)) {
+                const rssPostContainer = document.createElement('a');
                 const rssPostTitleContainer = document.createElement('div');
-                const rssPostTitle = document.createElement('h5');
-                const rssPostButton = document.createElement('button');
-                const rssPostDescription = document.createElement('p');
+                const rssPostTitleElement = document.createElement('h5');
+                const rssPostButtonElement = document.createElement('button');
+                const rssPostDescriptionElement = document.createElement('p');
 
-                rssPostElement.setAttribute('class', 'list-group-item list-group-item-action flex-column');
+                rssPostContainer.setAttribute('class', 'list-group-item list-group-item-action flex-column');
+                rssPostContainer.setAttribute('data-rssId', id);
                 rssPostTitleContainer.setAttribute('class', 'd-flex w-100');
-                rssPostTitle.setAttribute('class', 'mb-1 post-title');
-                rssPostButton.setAttribute('class', 'btn btn-primary');
-                rssPostButton.setAttribute('data-toggle', 'modal');
-                rssPostButton.setAttribute('data-target', '#exampleModal');
-                rssPostDescription.setAttribute('class', 'mb-1 d-none post-description');
-                rssPostTitle.textContent = getTitleData(post);
-                rssPostButton.textContent = 'More';
-                rssPostDescription.textContent = getDescriptionData(post);
+                rssPostTitleElement.setAttribute('class', 'mb-1 post-title');
+                rssPostButtonElement.setAttribute('class', 'btn btn-primary');
+                rssPostButtonElement.setAttribute('data-toggle', 'modal');
+                rssPostButtonElement.setAttribute('data-target', '#exampleModal');
+                rssPostDescriptionElement.setAttribute('class', 'mb-1 d-none post-description');
 
-                rssPostTitleContainer.append(rssPostTitle);
-                rssPostElement.append(rssPostTitleContainer, rssPostButton, rssPostDescription);
-                postsList.append(rssPostElement);
+                rssPostButtonElement.textContent = 'More';
+                rssPostTitleElement.textContent = postTitleContent;
+                rssPostDescriptionElement.textContent = postDescriptionContent;
+
+                rssPostTitleContainer.append(rssPostTitleElement);
+                rssPostContainer.append(rssPostTitleContainer, rssPostButtonElement, rssPostDescriptionElement);
+                postListContainer.append(rssPostContainer);
               }
             });
           };
-          setInterval(() => {
-            const rssListData = getSelectorItems('.rss-flow', 'name');
-            rssListData.map(rssItem => axios.get(buildProxyPath(rssItem)).then(listeningPath => {
-              const listeningXmlContent = getXmlContent(listeningPath);
-              const rssPosts = getRssPosts(listeningXmlContent);
-              addP(rssPosts);
+          const repeat = () => {
+            const rssFlowContentList = getSelectorContentItems('.rss-flow', 'data', 'path');
+            rssFlowContentList.forEach((path, id) => axios.get(path)
+              .then(listeningPath => {
+                const listeningXmlContent = getXmlContent(listeningPath);
+                const rssPosts = getSelectorItems(listeningXmlContent, 'item');
+                addPosts(rssPosts, id);
+                const postCon = getSelectorItems(postListContainer, 'a');
+                postCon.forEach(el => {
+                  el.getAttribute('data-rssid') == state.activeRssId
+                  ? el.setAttribute('class', 'list-group-item list-group-item-action flex-column')
+                  : el.setAttribute('class', 'd-none');
+                })
             }).catch(error => console.log(error)));
-          }, 6000);
+          };
+          repeat();
+          setInterval(repeat, 5000);
         }).catch(error => console.log(error));
-      inputRss.value = '';
+      inputRssElement.value = '';
     }
   });
 
   const submitValue = () => {
-    const rssListData = getSelectorItems('.rss-flow', 'name');
+    const rssFlowContentList = getSelectorContentItems('.rss-flow', 'data', 'path');
+    const submitedPath = buildPath(state.inputValue);
     if (!state.expectedNewValue) {
-      if (isIn(state.inputValue.trim(), rssListData) || !isURL(state.inputValue)) {
+      if (isIn(submitedPath, rssFlowContentList) || !isURL(state.inputValue)) {
         state.valid = false;
       } else {
-        state.amountElements += 1;
         state.expectedNewValue = true;
+      //  state.expectedActiveItem = true;
+        state.activeRssId = rssListContainter.childNodes.length;
       }
     }
   };
 
-  inputRss.addEventListener('input', (e) => {
+  inputRssElement.addEventListener('input', (e) => {
     state.valid = true;
     state.expectedNewValue = false;
+    state.expectedActiveItem = false;
     state.inputValue = e.target.value;
   });
 
-  postsList.addEventListener('click', ({ target }) => {
+  rssListContainter.addEventListener('click', ({target}) => {
+    const targetRssFlow = target.closest('.rss-flow');
+    rssListContainter.childNodes.forEach((el, id) => {
+      if (el === targetRssFlow) {
+        state.activeRssId = id;
+        state.expectedActiveItem = true;
+      }
+    })
+  });
+
+  postListContainer.addEventListener('click', ({ target }) => {
     if (target.hasAttribute('data-toggle')) {
       state.expectedModal = true;
       state.expectedNewValue = false;
-      state.currentPost = target.parentElement.querySelector('.post-title').textContent;
+      state.currentPost = getSelectorContent(target.parentElement, '.post-title');
     }
   });
-  modalCancel.addEventListener('click', () => {
+
+  modalFadeElement.addEventListener('click', () => {
     state.expectedModal = false;
   });
-  submitRss.addEventListener('click', submitValue);
+
+  submitRssElement.addEventListener('click', submitValue);
+
   document.addEventListener('keyup', ({ keyCode }) => {
     if (keyCode === 13) {
       submitValue();
+    }
+    if (keyCode === 27) {
+      state.expectedModal = false;
     }
   });
 };
