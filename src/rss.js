@@ -17,18 +17,15 @@ const modalTitleElement = document.querySelector('.modal-title');
 
 export default () => {
   const state = {
-    expectedNewValue: false,
-    expectedModal: false,
-    valid: true,
+    mode: 'view',
     inputValue: '',
     modalPostValue: '',
     newActiveRssId: 0,
-    swithcedRssId: 0,
   };
 
-  watch(state, ['expectedNewValue', 'expectedModal', 'valid', 'swithcedRssId'], () => {
+  watch(state, 'mode', () => {
     alertElement.setAttribute('class', 'alert alert-danger d-none');
-    if (!state.valid) {
+    if (state.mode === 'invalid') {
       alertElement.setAttribute('class', 'alert alert-danger mb-0');
     }
     const showActiveItems = id => {
@@ -42,8 +39,10 @@ export default () => {
         }
       });
     };
-    showActiveItems(state.newActiveRssId);
-    if (state.expectedModal) {
+    if (/^switchedRssNews/gm.test(state.mode)) {
+      showActiveItems(state.newActiveRssId);
+    }
+    if (state.mode === 'modal') {
       const postTitleList = getSelectorItems(postListContainer, '.post-title');
       postTitleList.forEach(title => {
         const modalTitleContent = title.textContent;
@@ -55,7 +54,7 @@ export default () => {
         }
       });
     }
-    if (state.expectedNewValue) {
+    if (state.mode === 'expectedNewValue') {
       const currentPath = buildPath(state.inputValue);
       axios.get(currentPath)
         .then(xmlFile => {
@@ -142,9 +141,8 @@ export default () => {
           setInterval(repeat, 5000);
           inputRssElement.value = '';
         }).catch(error => {
-          showActiveItems(rssListContainer.childNodes.length - 1);
-          alertElement.setAttribute('class', 'alert alert-danger mb-0')
-          console.log(error)
+          alertElement.setAttribute('class', 'alert alert-danger mb-0');
+          console.log(error);
         });
     }
   });
@@ -155,17 +153,16 @@ export default () => {
     const submitedPath = buildPath(state.inputValue);
     if (!state.expectedNewValue) {
       if (isIn(submitedPath, rssFlowContentList) || !isURL(state.inputValue)) {
-        state.valid = false;
+        state.mode = 'invalid';
       } else {
-        state.expectedNewValue = true;
+        state.mode = 'expectedNewValue';
         state.newActiveRssId = rssListContainerLength;
       }
     }
   };
 
   inputRssElement.addEventListener('input', e => {
-    state.valid = true;
-    state.expectedNewValue = false;
+    state.mode = 'view';
     state.inputValue = e.target.value;
   });
 
@@ -175,23 +172,21 @@ export default () => {
     rssListContainerItems.forEach((el, id) => {
       if (el === targetRssFlow) {
         state.newActiveRssId = id;
-        state.switchedRssId = state.newActiveRssId;
-        state.expectedNewValue = false;
+        state.mode = `switchedRssNewsTo${id}`;
       }
     });
   });
 
   postListContainer.addEventListener('click', ({ target }) => {
     if (target.hasAttribute('data-toggle')) {
-      state.expectedModal = true;
-      state.expectedNewValue = false;
+      state.mode = 'modal';
       const targetRssFlowElement = target.parentElement;
       state.modalPostValue = getSelectorContent(targetRssFlowElement, '.post-title');
     }
   });
 
   modalFadeElement.addEventListener('click', () => {
-    state.expectedModal = false;
+    state.mode = 'view';
   });
 
   submitRssElement.addEventListener('click', submitValue);
@@ -201,7 +196,7 @@ export default () => {
       submitValue();
     }
     if (keyCode === 27) {
-      state.expectedModal = false;
+      state.mode = 'view';
     }
   });
 };
