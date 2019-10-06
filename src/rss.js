@@ -1,6 +1,9 @@
 import { isURL, isIn } from 'validator';
 import { watch } from 'melanke-watchjs';
 import axios from 'axios';
+import {
+  getSelectorItems, getSelectorContent, getSelectorContentItems, getXmlContent, buildPath,
+} from './utils';
 
 const domparser = new DOMParser();
 const inputRssElement = document.querySelector('.form-control');
@@ -12,15 +15,6 @@ const modalFadeElement = document.querySelector('.fade');
 const modalBodyElement = document.querySelector('.modal-body');
 const modalTitleElement = document.querySelector('.modal-title');
 
-const getSelectorContentItems = (el, selector, prop = 'textContent', dataProp = null) => Array.prototype
-  .slice
-  .call(el.querySelectorAll(selector))
-  .map(item => ((prop === 'data') ? item.dataset[dataProp] : item[prop]));
-const getSelectorContent = (el, selector, prop = 'textContent') => el.querySelector(selector)[prop];
-const getSelectorItems = (el, selector) => el.querySelectorAll(selector);
-const getXmlContent = xmlFile => domparser.parseFromString(xmlFile.request.responseText, 'text/xml');
-const buildPath = path => `https://cors-anywhere.herokuapp.com/${path}`;
-
 export default () => {
   const state = {
     expectedNewValue: false,
@@ -28,11 +22,11 @@ export default () => {
     valid: true,
     inputValue: '',
     modalPostValue: '',
-    activeRssId: 0,
     newActiveRssId: 0,
+    swithcedRssId: 0,
   };
 
-  watch(state, ['expectedNewValue', 'expectedModal', 'valid', 'newActiveRssId'], () => {
+  watch(state, ['expectedNewValue', 'expectedModal', 'valid', 'swithcedRssId'], () => {
     alertElement.setAttribute('class', 'alert alert-danger d-none');
     if (!state.valid) {
       alertElement.setAttribute('class', 'alert alert-danger mb-0');
@@ -40,21 +34,23 @@ export default () => {
     const showActiveItems = id => {
       const postsContainers = getSelectorItems(postListContainer, 'div[data-postId]');
       postsContainers.forEach(container => {
-        if (container.dataset.postid === String(id)) {
+        const containerPostId = container.dataset.postid;
+        if (containerPostId === String(id)) {
           container.removeAttribute('class');
         } else {
           container.setAttribute('class', 'd-none');
         }
       });
     };
-    showActiveItems(state.activeRssId);
+    showActiveItems(state.newActiveRssId);
     if (state.expectedModal) {
       const postTitleList = getSelectorItems(postListContainer, '.post-title');
       postTitleList.forEach(title => {
-        if (title.textContent === state.modalPostValue) {
+        const modalTitleContent = title.textContent;
+        if (modalTitleContent === state.modalPostValue) {
           const modalPostDescription = title.parentElement.parentElement;
           const modalBodyContent = getSelectorContent(modalPostDescription, '.post-description');
-          modalTitleElement.textContent = title.textContent;
+          modalTitleElement.textContent = modalTitleContent;
           modalBodyElement.textContent = modalBodyContent;
         }
       });
@@ -63,7 +59,7 @@ export default () => {
       const currentPath = buildPath(state.inputValue);
       axios.get(currentPath)
         .then(xmlFile => {
-          const xmlContent = getXmlContent(xmlFile);
+          const xmlContent = getXmlContent(domparser, xmlFile);
           const rssFlowContainer = document.createElement('a');
           const rssFlowTitleContainer = document.createElement('div');
           const rssFlowTitleElement = document.createElement('h5');
@@ -77,7 +73,7 @@ export default () => {
           rssFlowContainer.setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
           rssFlowContainer.setAttribute('data-path', currentPath);
           postsContainer.setAttribute('class', 'd-none');
-          postsContainer.setAttribute('data-postid', `${state.activeRssId}`);
+          postsContainer.setAttribute('data-postid', `${state.newActiveRssId}`);
           rssFlowTitleContainer.setAttribute('class', 'd-flex w-100');
           rssFlowTitleElement.setAttribute('class', 'mb-1');
           rssFlowDescriptionElement.setAttribute('class', 'mb-1');
@@ -90,15 +86,17 @@ export default () => {
           rssFlowContainer.append(rssFlowTitleContainer, rssFlowDescriptionElement);
           rssListContainer.append(rssFlowContainer);
           postListContainer.append(postsContainer);
-          showActiveItems(state.activeRssId);
+          showActiveItems(state.newActiveRssId);
           const addPosts = (posts, id) => {
             posts.forEach(post => {
               const postTitleContent = getSelectorContent(post, 'title');
               const postDescriptionContent = getSelectorContent(post, 'description');
               const postsContainers = getSelectorItems(postListContainer, 'div[data-postId]');
               const rssFlowBadges = getSelectorItems(rssListContainer, '.badge');
+
               postsContainers.forEach(container => {
-                if (container.dataset.postid === String(id)) {
+                const containerPostId = container.dataset.postid;
+                if (containerPostId === String(id)) {
                   const containerTitlesContent = getSelectorContentItems(container, '.post-title');
                   if (!isIn(postTitleContent, containerTitlesContent)) {
                     const rssPostContainer = document.createElement('a');
@@ -124,7 +122,8 @@ export default () => {
                     rssPostContainer.append(rssPostDescriptionElement);
                     container.append(rssPostContainer);
                     const containerLength = container.childNodes.length;
-                    rssFlowBadges[id].textContent = containerLength;
+                    const rssFlowBadgeId = rssFlowBadges[id];
+                    rssFlowBadgeId.textContent = containerLength;
                   }
                 }
               });
@@ -134,7 +133,7 @@ export default () => {
             const rssFlowContentList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
             rssFlowContentList.forEach((path, id) => axios.get(path)
               .then(listeningPath => {
-                const listeningXmlContent = getXmlContent(listeningPath);
+                const listeningXmlContent = getXmlContent(domparser, listeningPath);
                 const rssPosts = getSelectorItems(listeningXmlContent, 'item');
                 addPosts(rssPosts, id);
               }).catch(error => console.log(error)));
@@ -142,7 +141,11 @@ export default () => {
           repeat();
           setInterval(repeat, 5000);
           inputRssElement.value = '';
-        }).catch(error => console.log(error));
+        }).catch(error => {
+          showActiveItems(rssListContainer.childNodes.length - 1);
+          alertElement.setAttribute('class', 'alert alert-danger mb-0')
+          console.log(error)
+        });
     }
   });
 
@@ -155,7 +158,7 @@ export default () => {
         state.valid = false;
       } else {
         state.expectedNewValue = true;
-        state.activeRssId = rssListContainerLength;
+        state.newActiveRssId = rssListContainerLength;
       }
     }
   };
@@ -171,8 +174,8 @@ export default () => {
     const rssListContainerItems = rssListContainer.childNodes;
     rssListContainerItems.forEach((el, id) => {
       if (el === targetRssFlow) {
-        state.activeRssId = id;
-        state.newActiveRssId = state.activeRssId;
+        state.newActiveRssId = id;
+        state.switchedRssId = state.newActiveRssId;
         state.expectedNewValue = false;
       }
     });
