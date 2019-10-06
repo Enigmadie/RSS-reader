@@ -70,7 +70,7 @@ export default () => {
           const rssFlowDescriptionContent = getSelectorContent(xmlContent, 'description');
 
           rssFlowContainer.setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
-          rssFlowContainer.setAttribute('data-path', currentPath);
+          rssFlowContainer.setAttribute('data-path', state.inputValue);
           postsContainer.setAttribute('class', 'd-none');
           postsContainer.setAttribute('data-postid', `${state.newActiveRssId}`);
           rssFlowTitleContainer.setAttribute('class', 'd-flex w-100');
@@ -130,12 +130,14 @@ export default () => {
           };
           const repeat = () => {
             const rssFlowContentList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
-            rssFlowContentList.forEach((path, id) => axios.get(path)
-              .then(listeningPath => {
-                const listeningXmlContent = getXmlContent(domparser, listeningPath);
+            rssFlowContentList.forEach((path, id) => {
+              const listeningPath = buildPath(path);
+              axios.get(listeningPath).then(listeningXml => {
+                const listeningXmlContent = getXmlContent(domparser, listeningXml);
                 const rssPosts = getSelectorItems(listeningXmlContent, 'item');
                 addPosts(rssPosts, id);
-              }).catch(error => console.log(error)));
+              }).catch(error => console.log(error));
+            });
           };
           repeat();
           setInterval(repeat, 5000);
@@ -150,14 +152,14 @@ export default () => {
   const submitValue = () => {
     const rssFlowContentList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
     const rssListContainerLength = rssListContainer.childNodes.length;
-    const submitedPath = buildPath(state.inputValue);
-    if (!state.expectedNewValue) {
-      if (isIn(submitedPath, rssFlowContentList) || !isURL(state.inputValue)) {
-        state.mode = 'invalid';
-      } else {
-        state.mode = 'expectedNewValue';
-        state.newActiveRssId = rssListContainerLength;
-      }
+    state.inputValue = (isURL(state.inputValue, { require_protocol: true }))
+      ? state.inputValue.replace(/(^\w+:|^)\/\//, '')
+      : state.inputValue;
+    if (isIn(state.inputValue, rssFlowContentList) || !isURL(state.inputValue)) {
+      state.mode = 'invalid';
+    } else {
+      state.mode = 'expectedNewValue';
+      state.newActiveRssId = rssListContainerLength;
     }
   };
 
