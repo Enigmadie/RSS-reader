@@ -2,7 +2,12 @@ import { isURL, isIn } from 'validator';
 import { watch } from 'melanke-watchjs';
 import axios from 'axios';
 import {
-  getSelectorItems, getSelectorContent, getSelectorContentItems, getXmlContent, buildPath,
+  getSelectorItems,
+  getSelectorContent,
+  getSelectorContentItems,
+  getXmlContent,
+  buildPath,
+  removeProtocol,
 } from './utils';
 
 const domparser = new DOMParser();
@@ -36,14 +41,12 @@ export default () => {
   };
 
   watch(state, 'mode', () => {
-    switch (state.mode) {
-      case 'invalid':
-        alertElement.setAttribute('class', 'alert alert-danger mb-0');
-        break;
-      case `switchedRssNewsTo${state.newActiveRssId}`:
-        showActivePosts(state.newActiveRssId);
-        break;
-      case 'modal': {
+    const switchPostId = `switchedToRssId${state.newActiveRssId}`;
+    const modeActions = {
+      view: () => alertElement.setAttribute('class', 'alert alert-danger d-none'),
+      invalid: () => alertElement.setAttribute('class', 'alert alert-danger mb-0'),
+      [switchPostId]: () => showActivePosts(state.newActiveRssId),
+      modal: () => {
         const postTitleList = getSelectorItems(postListContainer, '.post-title');
         postTitleList.forEach(title => {
           const modalTitleContent = title.textContent;
@@ -54,9 +57,8 @@ export default () => {
             modalBodyElement.textContent = modalBodyContent;
           }
         });
-        break;
-      }
-      case 'expectedNewValue': {
+      },
+      expectedNewValue: () => {
         const currentPath = buildPath(state.inputValue);
         axios.get(currentPath)
           .then(xmlFile => {
@@ -130,7 +132,7 @@ export default () => {
                 });
               });
             };
-            const repeat = () => {
+            const updatePosts = () => {
               const rssFlowContentList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
               rssFlowContentList.forEach((path, id) => {
                 const listeningPath = buildPath(path);
@@ -141,26 +143,22 @@ export default () => {
                 }).catch(error => console.log(error));
               });
             };
-            repeat();
-            setInterval(repeat, 5000);
+            updatePosts();
+            setInterval(updatePosts, 5000);
             inputRssElement.value = '';
           }).catch(error => {
             alertElement.setAttribute('class', 'alert alert-danger mb-0');
             console.log(error);
           });
-        break;
-      }
-      default:
-        alertElement.setAttribute('class', 'alert alert-danger d-none');
-    }
+      },
+    };
+    modeActions[state.mode]();
   });
 
   const submitValue = () => {
     const rssFlowContentList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
     const rssListContainerLength = rssListContainer.childNodes.length;
-    state.inputValue = (isURL(state.inputValue, { require_protocol: true }))
-      ? state.inputValue.replace(/(^\w+:|^)\/\//, '')
-      : state.inputValue;
+    state.inputValue = removeProtocol(state.inputValue);
     if (isIn(state.inputValue, rssFlowContentList) || !isURL(state.inputValue)) {
       state.mode = 'invalid';
     } else {
@@ -180,7 +178,7 @@ export default () => {
     rssListContainerItems.forEach((el, id) => {
       if (el === targetRssFlow) {
         state.newActiveRssId = id;
-        state.mode = `switchedRssNewsTo${id}`;
+        state.mode = `switchedToRssId${id}`;
       }
     });
   });

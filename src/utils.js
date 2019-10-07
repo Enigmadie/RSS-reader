@@ -1,3 +1,5 @@
+import { isURL } from 'validator';
+
 export const getSelectorContentItems = (el, selector, prop = 'textContent', dataProp = null) => Array.prototype
   .slice
   .call(el.querySelectorAll(selector))
@@ -10,3 +12,7 @@ export const getSelectorItems = (el, selector) => el.querySelectorAll(selector);
 export const getXmlContent = (parser, xmlFile) => parser.parseFromString(xmlFile.request.responseText, 'text/xml');
 
 export const buildPath = path => `https://cors-anywhere.herokuapp.com/${path}`;
+
+export const removeProtocol = url => (isURL(url, { require_protocol: true })
+  ? url.replace(/(^\w+:|^)\/\//, '')
+  : url);
