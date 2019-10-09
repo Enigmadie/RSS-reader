@@ -3,36 +3,36 @@ import { watch } from 'melanke-watchjs';
 import axios from 'axios';
 import {
   getSelectorItems,
-  getSelectorContent,
-  getSelectorContentItems,
-  getXmlContent,
+  getSelectorContent, getSelectorContentItems,
+  parseXmlContent,
   buildPath,
   removeProtocol,
 } from './utils';
 
 const domparser = new DOMParser();
-const inputRssElement = document.querySelector('.form-control');
-const alertElement = document.querySelector('.alert');
-const submitRssElement = document.querySelector('.btn');
-const rssListContainer = document.querySelector('.rss-flow-group');
-const postListContainer = document.querySelector('.posts-group');
-const modalFadeElement = document.querySelector('.fade');
-const modalBodyElement = document.querySelector('.modal-body');
-const modalTitleElement = document.querySelector('.modal-title');
-
-const showActivePosts = id => {
-  const postsContainers = getSelectorItems(postListContainer, 'div[data-postId]');
-  postsContainers.forEach(container => {
-    const containerPostId = container.dataset.postid;
-    if (containerPostId === String(id)) {
-      container.removeAttribute('class');
-    } else {
-      container.setAttribute('class', 'd-none');
-    }
-  });
-};
 
 export default () => {
+  const inputRssElement = document.querySelector('.form-control');
+  const alertElement = document.querySelector('.alert');
+  const submitRssElement = document.querySelector('.btn');
+  const rssListContainer = document.querySelector('.rss-flow-group');
+  const postListContainer = document.querySelector('.posts-group');
+  const modalFadeElement = document.querySelector('.fade');
+  const modalBodyElement = document.querySelector('.modal-body');
+  const modalTitleElement = document.querySelector('.modal-title');
+
+  const showActivePosts = (id) => {
+    const postsContainers = getSelectorItems(postListContainer, 'div[data-postId]');
+    postsContainers.forEach((container) => {
+      const containerPostId = container.dataset.postid;
+      if (containerPostId === String(id)) {
+        container.removeAttribute('class');
+      } else {
+        container.setAttribute('class', 'd-none');
+      }
+    });
+  };
+
   const state = {
     mode: 'view',
     inputValue: '',
@@ -48,7 +48,7 @@ export default () => {
       [switchPostId]: () => showActivePosts(state.newActiveRssId),
       modal: () => {
         const postTitleList = getSelectorItems(postListContainer, '.post-title');
-        postTitleList.forEach(title => {
+        postTitleList.forEach((title) => {
           const modalTitleContent = title.textContent;
           if (modalTitleContent === state.modalPostValue) {
             const modalPostDescription = title.parentElement.parentElement;
@@ -61,8 +61,8 @@ export default () => {
       expectedNewValue: () => {
         const currentPath = buildPath(state.inputValue);
         axios.get(currentPath)
-          .then(xmlFile => {
-            const xmlContent = getXmlContent(domparser, xmlFile);
+          .then((xmlContent) => {
+            const xmlParsedContent = parseXmlContent(domparser, xmlContent);
             const rssFlowContainer = document.createElement('a');
             const rssFlowTitleContainer = document.createElement('div');
             const rssFlowTitleElement = document.createElement('h5');
@@ -70,8 +70,8 @@ export default () => {
             const rssFlowBadgeCounter = document.createElement('span');
 
             const postsContainer = document.createElement('div');
-            const rssFlowTitleContent = getSelectorContent(xmlContent, 'title');
-            const rssFlowDescriptionContent = getSelectorContent(xmlContent, 'description');
+            const rssFlowTitleContent = getSelectorContent(xmlParsedContent, 'title');
+            const rssFlowDescriptionContent = getSelectorContent(xmlParsedContent, 'description');
 
             rssFlowContainer.setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
             rssFlowContainer.setAttribute('data-path', state.inputValue);
@@ -91,13 +91,13 @@ export default () => {
             postListContainer.append(postsContainer);
             showActivePosts(state.newActiveRssId);
             const addPosts = (posts, id) => {
-              posts.forEach(post => {
+              posts.forEach((post) => {
                 const postTitleContent = getSelectorContent(post, 'title');
                 const postDescriptionContent = getSelectorContent(post, 'description');
                 const postsContainers = getSelectorItems(postListContainer, 'div[data-postId]');
                 const rssFlowBadges = getSelectorItems(rssListContainer, '.badge');
 
-                postsContainers.forEach(container => {
+                postsContainers.forEach((container) => {
                   const containerPostId = container.dataset.postid;
                   if (containerPostId === String(id)) {
                     const containerTitlesContent = getSelectorContentItems(container, '.post-title');
@@ -136,17 +136,17 @@ export default () => {
               const rssFlowContentList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
               rssFlowContentList.forEach((path, id) => {
                 const listeningPath = buildPath(path);
-                axios.get(listeningPath).then(listeningXml => {
-                  const listeningXmlContent = getXmlContent(domparser, listeningXml);
+                axios.get(listeningPath).then((listeningXml) => {
+                  const listeningXmlContent = parseXmlContent(domparser, listeningXml);
                   const rssPosts = getSelectorItems(listeningXmlContent, 'item');
                   addPosts(rssPosts, id);
-                }).catch(error => console.log(error));
+                }).catch((error) => console.log(error));
               });
             };
             updatePosts();
             setInterval(updatePosts, 5000);
             inputRssElement.value = '';
-          }).catch(error => {
+          }).catch((error) => {
             alertElement.setAttribute('class', 'alert alert-danger mb-0');
             console.log(error);
           });
@@ -167,7 +167,7 @@ export default () => {
     }
   };
 
-  inputRssElement.addEventListener('input', e => {
+  inputRssElement.addEventListener('input', (e) => {
     state.mode = 'view';
     state.inputValue = e.target.value;
   });
