@@ -35,6 +35,8 @@ export default () => {
 
   const state = {
     mode: 'view',
+    rssContentItems: [],
+    rssFlowPaths: [],
     inputValue: '',
     modalPostValue: '',
     newActiveRssId: 0,
@@ -59,111 +61,122 @@ export default () => {
         });
       },
       expectedNewValue: () => {
-        const currentPath = buildPath(state.inputValue);
-        axios.get(currentPath)
-          .then((xmlContent) => {
-            const xmlParsedContent = parseXmlContent(domparser, xmlContent);
-            const rssFlowContainer = document.createElement('a');
-            const rssFlowTitleContainer = document.createElement('div');
-            const rssFlowTitleElement = document.createElement('h5');
-            const rssFlowDescriptionElement = document.createElement('p');
-            const rssFlowBadgeCounter = document.createElement('span');
+        const rssCurrentContentItem = state.rssContentItems[state.newActiveRssId];
+        const rssCurrentPathItem = state.rssFlowPaths[state.newActiveRssId];
+        const rssPathList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
+        if (!isIn(rssCurrentPathItem, rssPathList)) {
+          const rssFlowTitleContent = getSelectorContent(rssCurrentContentItem, 'title');
+          const rssFlowDescriptionContent = getSelectorContent(rssCurrentContentItem, 'description');
 
-            const postsContainer = document.createElement('div');
-            const rssFlowTitleContent = getSelectorContent(xmlParsedContent, 'title');
-            const rssFlowDescriptionContent = getSelectorContent(xmlParsedContent, 'description');
+          const rssFlowContainer = document.createElement('a');
+          const rssFlowTitleContainer = document.createElement('div');
+          const rssFlowTitleElement = document.createElement('h5');
+          const rssFlowDescriptionElement = document.createElement('p');
+          const rssFlowBadgeCounter = document.createElement('span');
+          const postsContainer = document.createElement('div');
 
-            rssFlowContainer.setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
-            rssFlowContainer.setAttribute('data-path', state.inputValue);
-            postsContainer.setAttribute('class', 'd-none');
-            postsContainer.setAttribute('data-postid', `${state.newActiveRssId}`);
-            rssFlowTitleContainer.setAttribute('class', 'd-flex w-100');
-            rssFlowTitleElement.setAttribute('class', 'mb-1');
-            rssFlowDescriptionElement.setAttribute('class', 'mb-1');
-            rssFlowBadgeCounter.setAttribute('class', 'badge badge-light');
+          rssFlowContainer.setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
+          rssFlowContainer.setAttribute('data-path', state.inputValue);
+          postsContainer.setAttribute('class', 'd-none');
+          postsContainer.setAttribute('data-postid', `${state.newActiveRssId}`);
+          rssFlowTitleContainer.setAttribute('class', 'd-flex w-100');
+          rssFlowTitleElement.setAttribute('class', 'mb-1');
+          rssFlowDescriptionElement.setAttribute('class', 'mb-1');
+          rssFlowBadgeCounter.setAttribute('class', 'badge badge-light');
 
-            rssFlowTitleElement.textContent = rssFlowTitleContent;
-            rssFlowDescriptionElement.textContent = rssFlowDescriptionContent;
+          rssFlowTitleElement.textContent = rssFlowTitleContent;
+          rssFlowDescriptionElement.textContent = rssFlowDescriptionContent;
 
-            rssFlowTitleContainer.append(rssFlowTitleElement, rssFlowBadgeCounter);
-            rssFlowContainer.append(rssFlowTitleContainer, rssFlowDescriptionElement);
-            rssListContainer.append(rssFlowContainer);
-            postListContainer.append(postsContainer);
-            showActivePosts(state.newActiveRssId);
-            const addPosts = (posts, id) => {
-              posts.forEach((post) => {
-                const postTitleContent = getSelectorContent(post, 'title');
-                const postDescriptionContent = getSelectorContent(post, 'description');
-                const postsContainers = getSelectorItems(postListContainer, 'div[data-postId]');
-                const rssFlowBadges = getSelectorItems(rssListContainer, '.badge');
-
-                postsContainers.forEach((container) => {
-                  const containerPostId = container.dataset.postid;
-                  if (containerPostId === String(id)) {
-                    const containerTitlesContent = getSelectorContentItems(container, '.post-title');
-                    if (!isIn(postTitleContent, containerTitlesContent)) {
-                      const rssPostContainer = document.createElement('a');
-                      const rssPostTitleContainer = document.createElement('div');
-                      const rssPostTitleElement = document.createElement('h5');
-                      const rssPostButtonElement = document.createElement('button');
-                      const rssPostDescriptionElement = document.createElement('p');
-
-                      rssPostContainer.setAttribute('class', 'list-group-item list-group-item-action flex-column');
-                      rssPostTitleContainer.setAttribute('class', 'd-flex w-100');
-                      rssPostTitleElement.setAttribute('class', 'mb-1 post-title');
-                      rssPostButtonElement.setAttribute('class', 'btn btn-primary');
-                      rssPostButtonElement.setAttribute('data-toggle', 'modal');
-                      rssPostButtonElement.setAttribute('data-target', '#rssModal');
-                      rssPostDescriptionElement.setAttribute('class', 'mb-1 d-none post-description');
-
-                      rssPostButtonElement.textContent = 'More';
-                      rssPostTitleElement.textContent = postTitleContent;
-                      rssPostDescriptionElement.textContent = postDescriptionContent;
-
-                      rssPostTitleContainer.append(rssPostTitleElement);
-                      rssPostContainer.append(rssPostTitleContainer, rssPostButtonElement);
-                      rssPostContainer.append(rssPostDescriptionElement);
-                      container.append(rssPostContainer);
-                      const containerLength = container.childNodes.length;
-                      const rssFlowBadgeId = rssFlowBadges[id];
-                      rssFlowBadgeId.textContent = containerLength;
-                    }
-                  }
-                });
-              });
-            };
-            const updatePosts = () => {
-              const rssFlowContentList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
-              rssFlowContentList.forEach((path, id) => {
-                const listeningPath = buildPath(path);
-                axios.get(listeningPath).then((listeningXml) => {
-                  const listeningXmlContent = parseXmlContent(domparser, listeningXml);
-                  const rssPosts = getSelectorItems(listeningXmlContent, 'item');
-                  addPosts(rssPosts, id);
-                }).catch((error) => console.log(error));
-              });
-            };
-            updatePosts();
-            setInterval(updatePosts, 5000);
-            inputRssElement.value = '';
-          }).catch((error) => {
-            alertElement.setAttribute('class', 'alert alert-danger mb-0');
-            console.log(error);
-          });
+          rssFlowTitleContainer.append(rssFlowTitleElement, rssFlowBadgeCounter);
+          rssFlowContainer.append(rssFlowTitleContainer, rssFlowDescriptionElement);
+          rssListContainer.append(rssFlowContainer);
+          postListContainer.append(postsContainer);
+          showActivePosts(state.newActiveRssId);
+          inputRssElement.value = '';
+        }
       },
+      expectedNewPosts: () => {
+        state.rssContentItems.forEach((rssContentItem, id) => {
+          const rssPosts = getSelectorItems(rssContentItem, 'item');
+          rssPosts.forEach((post) => {
+            const postTitleContent = getSelectorContent(post, 'title');
+            const postDescriptionContent = getSelectorContent(post, 'description');
+            const postsContainers = getSelectorItems(postListContainer, 'div[data-postId]');
+            const rssFlowBadges = getSelectorItems(rssListContainer, '.badge');
+
+            postsContainers.forEach((container) => {
+              const containerPostId = container.dataset.postid;
+              if (containerPostId === String(id)) {
+                const containerTitlesContent = getSelectorContentItems(container, '.post-title');
+                if (!isIn(postTitleContent, containerTitlesContent)) {
+                  const rssPostContainer = document.createElement('a');
+                  const rssPostTitleContainer = document.createElement('div');
+                  const rssPostTitleElement = document.createElement('h5');
+                  const rssPostButtonElement = document.createElement('button');
+                  const rssPostDescriptionElement = document.createElement('p');
+
+                  rssPostContainer.setAttribute('class', 'list-group-item list-group-item-action flex-column');
+                  rssPostTitleContainer.setAttribute('class', 'd-flex w-100');
+                  rssPostTitleElement.setAttribute('class', 'mb-1 post-title');
+                  rssPostButtonElement.setAttribute('class', 'btn btn-primary');
+                  rssPostButtonElement.setAttribute('data-toggle', 'modal');
+                  rssPostButtonElement.setAttribute('data-target', '#rssModal');
+                  rssPostDescriptionElement.setAttribute('class', 'mb-1 d-none post-description');
+
+                  rssPostButtonElement.textContent = 'More';
+                  rssPostTitleElement.textContent = postTitleContent;
+                  rssPostDescriptionElement.textContent = postDescriptionContent;
+
+                  rssPostTitleContainer.append(rssPostTitleElement);
+                  rssPostContainer.append(rssPostTitleContainer, rssPostButtonElement);
+                  rssPostContainer.append(rssPostDescriptionElement);
+                  container.append(rssPostContainer);
+                  const containerLength = container.childNodes.length;
+                  const rssFlowBadgeId = rssFlowBadges[id];
+                  rssFlowBadgeId.textContent = containerLength;
+                }
+              }
+            });
+          });
+        });
+      },
+      update: () => {},
     };
     modeActions[state.mode]();
   });
 
   const submitValue = () => {
-    const rssFlowContentList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
-    const rssListContainerLength = rssListContainer.childNodes.length;
+    const rssPathsList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
     state.inputValue = removeProtocol(state.inputValue);
-    if (isIn(state.inputValue, rssFlowContentList) || !isURL(state.inputValue)) {
+    if (isIn(state.inputValue, rssPathsList) || !isURL(state.inputValue)) {
       state.mode = 'invalid';
     } else {
-      state.mode = 'expectedNewValue';
-      state.newActiveRssId = rssListContainerLength;
+      state.newActiveRssId = state.rssFlowPaths.length;
+      state.rssFlowPaths.push(state.inputValue);
+      const currentPath = buildPath(state.inputValue);
+      const getXmlData = (path, id, param = null) => {
+        axios.get(path).then((xmlContent) => {
+          state.mode = 'update';
+          const xmlParsedContent = parseXmlContent(domparser, xmlContent);
+          if (param === 'rss') {
+            state.rssContentItems[id] = xmlParsedContent;
+            state.mode = 'expectedNewValue';
+          }
+          const xmlParsedItems = getSelectorContentItems(xmlParsedContent, 'item');
+          const prevXmlParsedItems = getSelectorContentItems(state.rssContentItems[id], 'item');
+          xmlParsedItems.forEach((item) => {
+            if (!isIn(item, prevXmlParsedItems)) {
+              state.rssContentItems[id] = xmlParsedContent;
+              state.mode = 'expectedNewPosts';
+            }
+          });
+          setTimeout(getXmlData(path, id), 5000);
+        }).catch((e) => {
+          state.mode = 'invalid';
+          console.log(e);
+        });
+      };
+      getXmlData(currentPath, state.newActiveRssId, 'rss');
     }
   };
 
