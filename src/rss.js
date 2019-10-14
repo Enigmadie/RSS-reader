@@ -60,7 +60,7 @@ export default () => {
           }
         });
       },
-      expectedNewValue: () => {
+      expectedNewRss: () => {
         const rssCurrentContentItem = state.rssContentItems[state.newActiveRssId];
         const rssCurrentPathItem = state.rssFlowPaths[state.newActiveRssId];
         const rssPathList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
@@ -160,7 +160,7 @@ export default () => {
           const xmlParsedContent = parseXmlContent(domparser, xmlContent);
           if (param === 'rss') {
             state.rssContentItems[id] = xmlParsedContent;
-            state.mode = 'expectedNewValue';
+            state.mode = 'expectedNewRss';
           }
           const xmlParsedItems = getSelectorContentItems(xmlParsedContent, 'item');
           const prevXmlParsedItems = getSelectorContentItems(state.rssContentItems[id], 'item');
@@ -170,7 +170,8 @@ export default () => {
               state.mode = 'expectedNewPosts';
             }
           });
-          setTimeout(getXmlData(path, id), 5000);
+          const timeOutParam = getXmlData(path, id);
+          setTimeout(timeOutParam, 5000);
         }).catch((e) => {
           state.mode = 'invalid';
           console.log(e);
