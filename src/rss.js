@@ -94,8 +94,6 @@ export default () => {
           showActivePosts(state.newActiveRssId);
           inputRssElement.value = '';
         }
-      },
-      expectedNewPosts: () => {
         state.rssContentItems.forEach((rssContentItem, id) => {
           const rssPosts = getSelectorItems(rssContentItem, 'item');
           rssPosts.forEach((post) => {
@@ -153,31 +151,47 @@ export default () => {
     } else {
       state.newActiveRssId = state.rssFlowPaths.length;
       state.rssFlowPaths.push(state.inputValue);
-      const currentPath = buildPath(state.inputValue);
-      const getXmlData = (path, id, param = null) => {
-        axios.get(path).then((xmlContent) => {
+      const updateContentItemsData = () => {
+        const pathPromises = state.rssFlowPaths.map((path) => axios.get(buildPath(path))
+          .then((v) => ({ result: 'success', value: v }))
+          .catch((e) => ({ result: 'error', value: e })));
+        const promise = Promise.all(pathPromises);
+        promise.then((contents) => {
           state.mode = 'update';
-          const xmlParsedContent = parseXmlContent(domparser, xmlContent);
-          if (param === 'rss') {
-            state.rssContentItems[id] = xmlParsedContent;
-            state.mode = 'expectedNewRss';
-          }
-          const xmlParsedItems = getSelectorContentItems(xmlParsedContent, 'item');
-          const prevXmlParsedItems = getSelectorContentItems(state.rssContentItems[id], 'item');
-          xmlParsedItems.forEach((item) => {
-            if (!isIn(item, prevXmlParsedItems)) {
-              state.rssContentItems[id] = xmlParsedContent;
-              state.mode = 'expectedNewPosts';
+          contents.map(({ result, value }, id) => {
+            const repeat = updateContentItemsData();
+            const lastIndex = contents.length - 1;
+            if (id === lastIndex) {
+              setTimeout(repeat, 5000);
             }
+            const resultActions = {
+              success: () => {
+                const xmlParsedContent = parseXmlContent(domparser, value);
+                const prevContentLastId = state.rssContentItems.length - 1;
+                if (prevContentLastId < id) {
+                  state.rssContentItems[id] = xmlParsedContent;
+                  state.mode = 'expectedNewRss';
+                }
+                const xmlParsedItems = getSelectorContentItems(xmlParsedContent, 'item');
+                const prevXmlParsedItems = getSelectorContentItems(state.rssContentItems[id], 'item');
+                xmlParsedItems.forEach((item) => {
+                  if (!isIn(item, prevXmlParsedItems)) {
+                    state.rssContentItems[id] = xmlParsedContent;
+                    state.mode = 'expectedNewRss';
+                  }
+                });
+              },
+              error: () => {
+                state.mode = 'invalid';
+                state.rssFlowPaths.pop();
+                setTimeout(repeat, 5000);
+              },
+            };
+            return resultActions[result]();
           });
-          const timeOutParam = getXmlData(path, id);
-          setTimeout(timeOutParam, 5000);
-        }).catch((e) => {
-          state.mode = 'invalid';
-          console.log(e);
         });
       };
-      getXmlData(currentPath, state.newActiveRssId, 'rss');
+      updateContentItemsData();
     }
   };
 
