@@ -150,48 +150,44 @@ export default () => {
       state.mode = 'invalid';
     } else {
       state.newActiveRssId = state.rssFlowPaths.length;
-      state.rssFlowPaths.push(state.inputValue);
-      const updateContentItemsData = () => {
-        const pathPromises = state.rssFlowPaths.map((path) => axios.get(buildPath(path))
-          .then((v) => ({ result: 'success', value: v }))
-          .catch((e) => ({ result: 'error', value: e })));
+      const newRssPath = buildPath(state.inputValue);
+
+      const updateContentItemsData = (paths) => {
+        const pathPromises = paths.map((path) => axios.get(buildPath(path)));
         const promise = Promise.all(pathPromises);
+
         promise.then((contents) => {
+          const rtimeOutAction = updateContentItemsData(state.rssFlowPaths);
           state.mode = 'update';
-          contents.map(({ result, value }, id) => {
-            const repeat = updateContentItemsData();
-            const lastIndex = contents.length - 1;
+          contents.map((xmlContent, id) => {
+            const lastIndex = paths.length - 1;
+            const xmlParsedContent = parseXmlContent(domparser, xmlContent);
+            const xmlParsedItems = getSelectorContentItems(xmlParsedContent, 'item');
+            const prevXmlParsedItems = getSelectorContentItems(state.rssContentItems[id], 'item');
             if (id === lastIndex) {
-              setTimeout(repeat, 5000);
+              setTimeout(rtimeOutAction, 5000);
             }
-            const resultActions = {
-              success: () => {
-                const xmlParsedContent = parseXmlContent(domparser, value);
-                const prevContentLastId = state.rssContentItems.length - 1;
-                if (prevContentLastId < id) {
-                  state.rssContentItems[id] = xmlParsedContent;
-                  state.mode = 'expectedNewRss';
-                }
-                const xmlParsedItems = getSelectorContentItems(xmlParsedContent, 'item');
-                const prevXmlParsedItems = getSelectorContentItems(state.rssContentItems[id], 'item');
-                xmlParsedItems.forEach((item) => {
-                  if (!isIn(item, prevXmlParsedItems)) {
-                    state.rssContentItems[id] = xmlParsedContent;
-                    state.mode = 'expectedNewRss';
-                  }
-                });
-              },
-              error: () => {
-                state.mode = 'invalid';
-                state.rssFlowPaths.pop();
-                setTimeout(repeat, 5000);
-              },
-            };
-            return resultActions[result]();
+            return xmlParsedItems.forEach((item) => {
+              if (!isIn(item, prevXmlParsedItems)) {
+                state.rssContentItems[id] = xmlParsedContent;
+                state.mode = 'expectedNewRss';
+              }
+            });
           });
         });
       };
-      updateContentItemsData();
+      axios.get(newRssPath).then((xmlContent) => {
+        const xmlParsedContent = parseXmlContent(domparser, xmlContent);
+        state.rssContentItems.push(xmlParsedContent);
+        state.rssFlowPaths.push(state.inputValue);
+
+        const timeOutAction = updateContentItemsData(state.rssFlowPaths);
+        state.mode = 'expectedNewRss';
+        setTimeout(timeOutAction, 5000);
+      }).catch((error) => {
+        state.mode = 'invalid';
+        console.log(error);
+      });
     }
   };
 
