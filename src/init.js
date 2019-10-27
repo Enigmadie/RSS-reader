@@ -72,7 +72,7 @@ export default () => {
   });
 
   watch(state.process, 'state', () => {
-    if (state.process.state === 'checked') {
+    if (state.status.state === 'checked') {
       const rssPathList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
       state.contentItems.forEach(({
         status,
@@ -167,7 +167,7 @@ export default () => {
       state.newActiveRssId = state.rssFlowPaths.length;
       state.rssFlowPaths.push(state.inputValue);
       state.contentItems.push('expectedValue');
-      const repeat = (paths) => {
+      const checkPath = (paths) => {
         state.process.upload();
         const pathPromises = paths.map((path) => axios.get(buildPath(path))
           .then((v) => ({ result: 'success', value: v }))
@@ -226,10 +226,10 @@ export default () => {
           });
         }).then(() => {
           state.process.check();
-          return setTimeout(() => repeat(state.rssFlowPaths), 5000);
+          return setTimeout(() => checkPath(state.rssFlowPaths), 5000);
         });
       };
-      repeat(state.rssFlowPaths);
+      checkPath(state.rssFlowPaths);
     }
   });
 };
