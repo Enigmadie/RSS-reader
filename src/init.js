@@ -43,7 +43,7 @@ export default () => {
     process: new StateMachine({
       init: 'init',
       transitions: [
-        { name: 'upload', from: ['init', 'checked'], to: 'uploaded' },
+        { name: 'upload', from: ['init', 'checked', 'observed'], to: 'uploaded' },
         { name: 'check', from: 'uploaded', to: 'checked' },
         { name: 'error', from: ['init', 'uploaded'], to: 'observed' },
       ],
@@ -59,7 +59,10 @@ export default () => {
     const switchPostId = `switchedToRssId${state.newActiveRssId}`;
     const modeActions = {
       view: () => alertElement.setAttribute('class', 'alert alert-danger d-none'),
-      invalid: () => alertElement.setAttribute('class', 'alert alert-danger mb-0'),
+      invalid: () => {
+        alertElement.setAttribute('class', 'alert alert-danger mb-0');
+        alertElement.textContent = 'Please provide a valid address';
+      },
       [switchPostId]: () => showActivePosts(state.newActiveRssId),
       modal: () => {
         const modalTitleContent = getSelectorContent(state.modalElement, '.post-title');
@@ -72,17 +75,21 @@ export default () => {
   });
 
   watch(state.process, 'state', () => {
-    if (state.status.state === 'checked') {
+    if (state.process.state === 'observed') {
+      alertElement.textContent = 'Attempting to reconnect...';
+      alertElement.setAttribute('class', 'alert alert-danger mb-0');
+    }
+    if (state.process.state === 'checked') {
+      alertElement.setAttribute('class', 'alert alert-danger d-none');
       const rssPathList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
       state.contentItems.forEach(({
         status,
         title,
         description,
-        posts,
         newPosts,
       }, id) => {
         const currentRssPath = state.rssFlowPaths[id];
-        const isAccessiblePath = status === 'accessible';
+        const hasAccessiblePath = status === 'accessible';
         const expectedNewRss = !isIn(currentRssPath, rssPathList);
         const expectedNewPosts = newPosts.length > 0;
 
@@ -104,26 +111,26 @@ export default () => {
               <span class="badge badge-light"></span>
             </div>
             <p class="mb-1">${description}</p>`;
-          if (isAccessiblePath) {
+          if (hasAccessiblePath) {
             showActivePosts(state.newActiveRssId);
             inputRssElement.value = '';
           }
         }
 
-        if (isAccessiblePath) {
+        if (hasAccessiblePath) {
           const rssContainers = getSelectorItems(rssListContainer, 'a[data-rssid]');
           rssContainers[id].setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
-          const rssFlowBadges = getSelectorItems(rssListContainer, '.badge');
-          rssFlowBadges[id].textContent = posts.length;
         }
 
         if (expectedNewPosts) {
+          const rssFlowBadges = getSelectorItems(rssListContainer, '.badge');
           newPosts.forEach((post) => {
             const postsContainers = getSelectorItems(postListContainer, 'div[data-postId]');
             const currentPostsContainer = postsContainers[id];
             const postBlock = document.createElement('a');
             postBlock.setAttribute('class', 'list-group-item list-group-item-action flex-column');
             currentPostsContainer.append(postBlock);
+            rssFlowBadges[id].textContent = currentPostsContainer.childNodes.length;
 
             postBlock.innerHTML = `<div class="d-flex w-100">
               <h5 class="mb-1 post-title">${post.title}</h5>
@@ -167,7 +174,7 @@ export default () => {
       state.newActiveRssId = state.rssFlowPaths.length;
       state.rssFlowPaths.push(state.inputValue);
       state.contentItems.push('expectedValue');
-      const checkPath = (paths) => {
+      const checkPaths = (paths) => {
         state.process.upload();
         const pathPromises = paths.map((path) => axios.get(buildPath(path))
           .then((v) => ({ result: 'success', value: v }))
@@ -177,8 +184,8 @@ export default () => {
           responses.map((res, id) => {
             const currentContentItem = state.contentItems[id];
             const { status } = currentContentItem;
-            const isNew = currentContentItem === 'expectedValue';
-            const isNowAccessible = status === 'inaccessible';
+            const hasNewItem = currentContentItem === 'expectedValue';
+            const hasNowAccessibleItem = status === 'inaccessible';
 
             const responseActions = {
               success: () => {
@@ -187,7 +194,7 @@ export default () => {
                 const title = getSelectorContent(xmlContent, 'title');
                 const description = getSelectorContent(xmlContent, 'description');
                 const postsData = getPostsData(xmlItems, 'title', 'description');
-                if (isNew || isNowAccessible) {
+                if (hasNewItem || hasNowAccessibleItem) {
                   state.contentItems[id] = {
                     status: 'accessible',
                     title,
@@ -208,7 +215,7 @@ export default () => {
                 }
               },
               error: () => {
-                if (isNew) {
+                if (hasNewItem) {
                   state.mode = 'invalid';
                   state.contentItems[id] = {
                     status: 'inaccessible',
@@ -225,11 +232,16 @@ export default () => {
             return responseActions[res.result]();
           });
         }).then(() => {
-          state.process.check();
-          return setTimeout(() => checkPath(state.rssFlowPaths), 5000);
+          const hasConnection = navigator.onLine;
+          if (hasConnection) {
+            state.process.check();
+            return setTimeout(() => checkPaths(state.rssFlowPaths), 5000);
+          }
+          state.process.error();
+          return setTimeout(() => checkPaths(state.rssFlowPaths), 30000);
         });
       };
-      checkPath(state.rssFlowPaths);
+      checkPaths(state.rssFlowPaths);
     }
   });
 };
