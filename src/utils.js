@@ -28,8 +28,4 @@ export const getParsedData = (data) => {
 };
 export const buildPath = (path) => `https://cors-anywhere.herokuapp.com/${path}`;
 
-export const removeProtocol = (url) => (isURL(url, { require_protocol: true })
-  ? url.replace(/(^\w+:|^)\/\//, '')
-  : url);
-
 export const isValid = (value, coll) => (!isIn(value, coll) && isURL(value));
