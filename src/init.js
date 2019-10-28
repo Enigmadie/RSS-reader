@@ -45,7 +45,7 @@ export default () => {
       transitions: [
         { name: 'upload', from: ['init', 'checked', 'observed'], to: 'uploaded' },
         { name: 'check', from: 'uploaded', to: 'checked' },
-        { name: 'error', from: ['init', 'uploaded'], to: 'observed' },
+        { name: 'error', from: 'uploaded', to: 'observed' },
       ],
     }),
     contentItems: [],
@@ -54,6 +54,7 @@ export default () => {
     inputValue: '',
     modalElement: null,
     newActiveRssId: 0,
+    delay: 5000,
   };
 
   watch(state, ['mode', 'errorMessage'], () => {
@@ -86,10 +87,10 @@ export default () => {
       }, id) => {
         const currentRssPath = state.rssFlowPaths[id];
         const hasAccessiblePath = status === 'accessible';
-        const expectedNewRss = !isIn(currentRssPath, rssPathList);
-        const expectedNewPosts = newPosts.length > 0;
+        const hasNewRss = !isIn(currentRssPath, rssPathList);
+        const hasNewPosts = newPosts.length > 0;
 
-        if (expectedNewRss) {
+        if (hasNewRss) {
           const rssFlowContainer = document.createElement('a');
           const postsContainer = document.createElement('div');
 
@@ -114,11 +115,11 @@ export default () => {
         }
 
         if (hasAccessiblePath) {
-          const rssContainers = getSelectorItems(rssListContainer, 'a[data-rssid]');
-          rssContainers[id].setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
+          const rssFlowContainers = getSelectorItems(rssListContainer, 'a[data-rssid]');
+          rssFlowContainers[id].setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
         }
 
-        if (expectedNewPosts) {
+        if (hasNewPosts) {
           const rssFlowBadges = getSelectorItems(rssListContainer, '.badge');
           newPosts.forEach((post) => {
             const postsContainers = getSelectorItems(postListContainer, 'div[data-postId]');
@@ -140,8 +141,8 @@ export default () => {
     }
   });
 
-  inputRssElement.addEventListener('input', (e) => {
-    state.inputValue = e.target.value;
+  inputRssElement.addEventListener('input', ({ target }) => {
+    state.inputValue = target.value;
   });
 
   rssListContainer.addEventListener('click', ({ target }) => {
@@ -233,13 +234,19 @@ export default () => {
         }).then(() => {
           const hasConnection = navigator.onLine;
           if (hasConnection) {
+            const hasRestoredConnection = /lost/g.test(state.errorMessage);
+            if (hasRestoredConnection) {
+              state.mode = 'view';
+            }
             state.updateDataProcess.check();
-            return setTimeout(() => checkPaths(state.rssFlowPaths), 5000);
+            state.delay = 5000;
+          } else {
+            state.updateDataProcess.error();
+            state.mode = 'invalid';
+            state.errorMessage = 'Your device lost its internet connection';
+            state.delay = 30000;
           }
-          state.updateDataProcess.error();
-          state.mode = 'invalid';
-          state.errorMessage = 'Your device lost its internet connection';
-          return setTimeout(() => checkPaths(state.rssFlowPaths), 30000);
+          return setTimeout(() => checkPaths(state.rssFlowPaths), state.delay);
         });
       };
       checkPaths(state.rssFlowPaths);
