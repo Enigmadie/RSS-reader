@@ -40,7 +40,7 @@ export default () => {
 
   const state = {
     mode: 'view',
-    process: new StateMachine({
+    updateDataProcess: new StateMachine({
       init: 'init',
       transitions: [
         { name: 'upload', from: ['init', 'checked', 'observed'], to: 'uploaded' },
@@ -50,18 +50,19 @@ export default () => {
     }),
     contentItems: [],
     rssFlowPaths: [],
+    errorMessage: '',
     inputValue: '',
     modalElement: null,
     newActiveRssId: 0,
   };
 
-  watch(state, 'mode', () => {
+  watch(state, ['mode', 'errorMessage'], () => {
     const switchPostId = `switchedToRssId${state.newActiveRssId}`;
     const modeActions = {
       view: () => alertElement.setAttribute('class', 'alert alert-danger d-none'),
       invalid: () => {
         alertElement.setAttribute('class', 'alert alert-danger mb-0');
-        alertElement.textContent = 'Please provide a valid address';
+        alertElement.textContent = state.errorMessage;
       },
       [switchPostId]: () => showActivePosts(state.newActiveRssId),
       modal: () => {
@@ -74,13 +75,8 @@ export default () => {
     modeActions[state.mode]();
   });
 
-  watch(state.process, 'state', () => {
-    if (state.process.state === 'observed') {
-      alertElement.textContent = 'Attempting to reconnect...';
-      alertElement.setAttribute('class', 'alert alert-danger mb-0');
-    }
-    if (state.process.state === 'checked') {
-      alertElement.setAttribute('class', 'alert alert-danger d-none');
+  watch(state.updateDataProcess, 'state', () => {
+    if (state.updateDataProcess.state === 'checked') {
       const rssPathList = getSelectorContentItems(document, '.rss-flow', 'data', 'path');
       state.contentItems.forEach(({
         status,
@@ -130,7 +126,8 @@ export default () => {
             const postBlock = document.createElement('a');
             postBlock.setAttribute('class', 'list-group-item list-group-item-action flex-column');
             currentPostsContainer.append(postBlock);
-            rssFlowBadges[id].textContent = currentPostsContainer.childNodes.length;
+            const containerLength = currentPostsContainer.childNodes.length;
+            rssFlowBadges[id].textContent = containerLength;
 
             postBlock.innerHTML = `<div class="d-flex w-100">
               <h5 class="mb-1 post-title">${post.title}</h5>
@@ -169,13 +166,14 @@ export default () => {
   submitRssElement.addEventListener('click', () => {
     if (!isValid(state.inputValue, state.rssFlowPaths)) {
       state.mode = 'invalid';
+      state.errorMessage = 'Please provide a valid address';
     } else {
       state.mode = 'view';
       state.newActiveRssId = state.rssFlowPaths.length;
       state.rssFlowPaths.push(state.inputValue);
       state.contentItems.push('expectedValue');
       const checkPaths = (paths) => {
-        state.process.upload();
+        state.updateDataProcess.upload();
         const pathPromises = paths.map((path) => axios.get(buildPath(path))
           .then((v) => ({ result: 'success', value: v }))
           .catch((e) => ({ result: 'error', error: e })));
@@ -217,6 +215,7 @@ export default () => {
               error: () => {
                 if (hasNewItem) {
                   state.mode = 'invalid';
+                  state.errorMessage = 'The address is currently inaccessible';
                   state.contentItems[id] = {
                     status: 'inaccessible',
                     title: '',
@@ -234,10 +233,12 @@ export default () => {
         }).then(() => {
           const hasConnection = navigator.onLine;
           if (hasConnection) {
-            state.process.check();
+            state.updateDataProcess.check();
             return setTimeout(() => checkPaths(state.rssFlowPaths), 5000);
           }
-          state.process.error();
+          state.updateDataProcess.error();
+          state.mode = 'invalid';
+          state.errorMessage = 'Your device lost its internet connection';
           return setTimeout(() => checkPaths(state.rssFlowPaths), 30000);
         });
       };
