@@ -7,7 +7,7 @@ export const getSelectorContentItems = (el, selector, prop = 'textContent', data
 
 export const getSelectorByAttr = (el, selector, attr, dataProp = null) => {
   const selectorItems = el.querySelectorAll(selector);
-  let result = null;
+  let result;
   selectorItems.forEach((item) => {
     const currentAttr = dataProp === null
       ? item.getAttribute(selector)
