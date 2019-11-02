@@ -75,6 +75,7 @@ export default () => {
       state.mode = 'invalid';
       state.errorMessage = 'Please provide a valid address';
     } else {
+      state.mode = 'view';
       state.inputValue = target.value;
     }
   });
