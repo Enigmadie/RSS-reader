@@ -1,24 +1,5 @@
 import { isURL, isIn } from 'validator';
 
-export const getSelectorContentItems = (el, selector, prop = 'textContent', dataProp = null) => Array.prototype
-  .slice
-  .call(el.querySelectorAll(selector))
-  .map((item) => ((prop === 'data') ? item.dataset[dataProp] : item[prop]));
-
-export const getSelectorByAttr = (el, selector, attr, dataProp = null) => {
-  const selectorItems = el.querySelectorAll(selector);
-  let result;
-  selectorItems.forEach((item) => {
-    const currentAttr = dataProp === null
-      ? item.getAttribute(selector)
-      : item.dataset[dataProp];
-    if (currentAttr === attr) {
-      result = item;
-    }
-  });
-  return result;
-};
-
 export const getSelectorContent = (el, selector, prop = 'textContent') => el.querySelector(selector)[prop];
 
 export const getPostsData = (el, firstSelector, secondSelector) => {
@@ -34,7 +15,7 @@ export const getPostsData = (el, firstSelector, secondSelector) => {
   return result;
 };
 
-export const getParsedData = (data) => {
+export const getXmlContent = (data) => {
   const domparser = new DOMParser();
   return domparser.parseFromString(data, 'text/xml');
 };

@@ -3,11 +3,12 @@ import 'bootstrap/js/dist/modal';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import StateMachine from 'javascript-state-machine';
 import axios from 'axios';
-import { union, includes } from 'lodash';
-import { modeWatcher, rssWatcher } from './watchers';
+import { union, differenceBy } from 'lodash';
+import i18next from 'i18next';
+import { modeWatcher, feedWatcher, postWatcher } from './watchers';
 import {
   getSelectorContent,
-  getParsedData,
+  getXmlContent,
   buildPath,
   isValid,
   getPostsData,
@@ -21,6 +22,20 @@ export default () => {
   const postListContainer = document.querySelector('.posts-group');
   const modalFadeElement = document.querySelector('.fade');
 
+  i18next.init({
+    lng: 'en',
+    debug: true,
+    resources: {
+      en: {
+        translation: {
+          inaccessible: 'The address is inaccessible',
+          inaccessibleLater: 'One or more addresses became inaccessible',
+          network: 'Your device lost its internet connection',
+          invalid: 'The address is not valid',
+        },
+      },
+    },
+  });
   const state = {
     mode: 'view',
     updateDataProcess: new StateMachine({
@@ -31,7 +46,8 @@ export default () => {
         { name: 'error', from: 'uploaded', to: 'observed' },
       ],
     }),
-    rssData: [],
+    feedsData: [],
+    postsData: [],
     errorMessage: '',
     inputValue: '',
     modalElement: null,
@@ -44,12 +60,11 @@ export default () => {
     state.updateDataProcess.upload();
     paths.map((path, id) => axios.get(path)
       .then((res) => {
-        const pathData = state.rssData[id];
-        const xmlContent = getParsedData(res.data);
+        const pathData = state.postsData[id];
+        const xmlContent = getXmlContent(res.data);
         const xmlItems = xmlContent.querySelectorAll('item');
         const posts = getPostsData(xmlItems, 'title', 'description');
-        const oldPostsTitle = pathData.posts.map((el) => el.title);
-        const newPosts = posts.filter((post) => !includes(oldPostsTitle, post.title));
+        const newPosts = differenceBy(posts, pathData.posts, 'title');
         if (newPosts.length > 0) {
           pathData.posts = union(pathData.posts, newPosts);
           pathData.newPosts = newPosts;
@@ -60,20 +75,30 @@ export default () => {
         }
         if (id === lastId) {
           state.updateDataProcess.check();
-          const currentPaths = state.rssData.map((el) => el.path);
+          const currentPaths = state.postsData.map((el) => el.path);
           setTimeout(() => updatePathData(currentPaths), state.delay);
         }
-      }).catch((e) => console.log(e)));
+      }).catch(() => {
+        const hasConnection = navigator.onLine;
+        state.mode = 'invalid';
+        if (!hasConnection) {
+          state.errorMessage = i18next.t('network');
+          state.delay = 30000;
+        } else {
+          state.errorMessage = i18next.t('inaccessibleLater');
+        }
+      }));
   };
 
   modeWatcher(state, ['mode', 'errorMessage'], document);
-  rssWatcher(state, 'state', document);
+  feedWatcher(state, 'feedsData', document);
+  postWatcher(state, 'state', document);
 
   inputRssElement.addEventListener('input', ({ target }) => {
-    const paths = state.rssData.map((el) => el.path);
+    const paths = state.postsData.map((el) => el.path);
     if (!isValid(target.value, paths)) {
       state.mode = 'invalid';
-      state.errorMessage = 'Please provide a valid address';
+      state.errorMessage = i18next.t('invalid');
     } else {
       state.mode = 'view';
       state.inputValue = target.value;
@@ -104,33 +129,29 @@ export default () => {
     state.mode = 'view';
     const path = buildPath(state.inputValue);
     axios.get(path).then(({ data }) => {
-      const xmlContent = getParsedData(data);
+      const xmlContent = getXmlContent(data);
       const xmlItems = xmlContent.querySelectorAll('item');
       const title = getSelectorContent(xmlContent, 'title');
       const description = getSelectorContent(xmlContent, 'description');
       const posts = getPostsData(xmlItems, 'title', 'description');
-      state.rssData.push({
-        hasNewItems: true,
+      state.feedsData.push({
         path,
         title,
         description,
+      });
+      state.postsData.push({
+        hasNewItems: true,
+        path,
         posts,
         newPosts: posts,
       });
       if (state.updateDataProcess.state === 'init') {
-        const paths = state.rssData.map((el) => el.path);
+        const paths = state.postsData.map((el) => el.path);
         updatePathData(paths);
       }
-    }).catch((err) => {
-      const hasConnection = navigator.onLine;
+    }).catch(() => {
       state.mode = 'invalid';
-      if (!hasConnection) {
-        state.errorMessage = 'Your device lost its internet connection';
-        state.delay = 30000;
-      } else {
-        state.errorMessage = 'The address is currently inaccessible';
-      }
-      console.log(err);
+      state.errorMessage = i18next.t('inaccessible');
     });
   });
 };

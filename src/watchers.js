@@ -1,10 +1,7 @@
 import { watch } from 'melanke-watchjs';
-import { isIn } from 'validator';
 import {
   showActivePosts,
   getSelectorContent,
-  getSelectorContentItems,
-  getSelectorByAttr,
 } from './utils';
 
 export const modeWatcher = (state, param, doc) => {
@@ -33,46 +30,47 @@ export const modeWatcher = (state, param, doc) => {
   });
 };
 
-export const rssWatcher = (state, param, doc) => {
+export const feedWatcher = (state, param, doc) => {
   const rssListContainer = doc.querySelector('.rss-flow-group');
   const postListContainer = doc.querySelector('.posts-group');
   const inputRssElement = doc.querySelector('.form-control');
+  const feedsData = state[param];
+  watch(state, param, () => {
+    const lastId = feedsData.length - 1;
+    const lastFeed = feedsData[lastId];
 
-  watch(state.updateDataProcess, param, () => {
-    if (state.updateDataProcess[param] === 'uploaded') {
-      const rssPathList = getSelectorContentItems(doc, '.rss-flow', 'data', 'path');
-      state.rssData.forEach(({
-        path,
-        title,
-        description,
-        hasNewItems,
-        posts,
-        newPosts,
-      }) => {
-        const hasNewRss = !isIn(path, rssPathList);
-        if (hasNewRss) {
-          const rssFlowContainer = doc.createElement('a');
-          const postsContainer = doc.createElement('div');
+    const { path, title, description } = lastFeed;
+    const rssFlowContainer = doc.createElement('a');
+    const postsContainer = doc.createElement('div');
 
-          rssFlowContainer.setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
-          rssFlowContainer.setAttribute('data-path', path);
-          postsContainer.setAttribute('data-path', path);
+    rssFlowContainer.setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
+    rssFlowContainer.setAttribute('data-path', path);
+    postsContainer.setAttribute('data-path', path);
 
-          rssListContainer.append(rssFlowContainer);
-          postListContainer.append(postsContainer);
+    rssListContainer.append(rssFlowContainer);
+    postListContainer.append(postsContainer);
 
-          rssFlowContainer.innerHTML = `<div class="d-flex w100">
-              <h5 class="mb-1">${title}</h5>
-              <span class="badge badge-light"></span>
-            </div>
-            <p class="mb-1">${description}</p>`;
-          showActivePosts(path, postListContainer, 'div[data-path]');
-          inputRssElement.value = '';
-        }
+    rssFlowContainer.innerHTML = `<div class="d-flex w100">
+        <h5 class="mb-1">${title}</h5>
+        <span class="badge badge-light"></span>
+      </div>
+      <p class="mb-1">${description}</p>`;
+    showActivePosts(path, postListContainer, 'div[data-path]');
+    inputRssElement.value = '';
+  });
+};
+
+export const postWatcher = (state, param, doc) => {
+  const updateState = state.updateDataProcess;
+  const rssListContainer = doc.querySelector('.rss-flow-group');
+  const postListContainer = doc.querySelector('.posts-group');
+  watch(updateState, param, () => {
+    if (updateState.state === 'uploaded') {
+      state.postsData.forEach(({ hasNewItems, posts, newPosts }, id) => {
         if (hasNewItems) {
-          newPosts.forEach((post) => {
-            const currentPostsContainer = getSelectorByAttr(postListContainer, 'div[data-path]', path, 'path');
-            const currentRssFlowContainer = getSelectorByAttr(rssListContainer, 'a[data-path]', path, 'path');
+          newPosts.forEach(({ title, description }) => {
+            const currentPostsContainer = postListContainer.childNodes[id];
+            const currentRssFlowContainer = rssListContainer.childNodes[id];
             const rssFlowBadge = currentRssFlowContainer.querySelector('.badge');
             const postBlock = doc.createElement('a');
             postBlock.setAttribute('class', 'list-group-item list-group-item-action flex-column');
@@ -81,10 +79,10 @@ export const rssWatcher = (state, param, doc) => {
             rssFlowBadge.textContent = containerLength;
 
             postBlock.innerHTML = `<div class="d-flex w-100">
-                <h5 class="mb-1 post-title">${post.title}</h5>
+                <h5 class="mb-1 post-title">${title}</h5>
               </div>
               <button class="btn btn-primary" data-toggle="modal" data-target="#rssModal">More</button>
-              <p class="mb-1 d-none post-description">${post.description}</p>`;
+              <p class="mb-1 d-none post-description">${description}</p>`;
           });
         }
       });
