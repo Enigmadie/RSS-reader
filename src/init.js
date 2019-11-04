@@ -48,6 +48,7 @@ export default () => {
     }),
     feedsData: [],
     postsData: [],
+    paths: [],
     errorMessage: '',
     inputValue: '',
     modalElement: null,
@@ -75,8 +76,7 @@ export default () => {
         }
         if (id === lastId) {
           state.updateDataProcess.check();
-          const currentPaths = state.postsData.map((el) => el.path);
-          setTimeout(() => updatePathData(currentPaths), state.delay);
+          setTimeout(() => updatePathData(state.paths), state.delay);
         }
       }).catch(() => {
         const hasConnection = navigator.onLine;
@@ -95,8 +95,7 @@ export default () => {
   postWatcher(state, 'state', document);
 
   inputRssElement.addEventListener('input', ({ target }) => {
-    const paths = state.postsData.map((el) => el.path);
-    if (!isValid(target.value, paths)) {
+    if (!isValid(target.value, state.paths)) {
       state.mode = 'invalid';
       state.errorMessage = i18next.t('invalid');
     } else {
@@ -134,20 +133,18 @@ export default () => {
       const title = getSelectorContent(xmlContent, 'title');
       const description = getSelectorContent(xmlContent, 'description');
       const posts = getPostsData(xmlItems, 'title', 'description');
+      state.paths.push(path);
       state.feedsData.push({
-        path,
         title,
         description,
       });
       state.postsData.push({
         hasNewItems: true,
-        path,
         posts,
         newPosts: posts,
       });
       if (state.updateDataProcess.state === 'init') {
-        const paths = state.postsData.map((el) => el.path);
-        updatePathData(paths);
+        updatePathData(state.paths);
       }
     }).catch(() => {
       state.mode = 'invalid';

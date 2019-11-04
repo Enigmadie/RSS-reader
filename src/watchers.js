@@ -37,15 +37,15 @@ export const feedWatcher = (state, param, doc) => {
   const feedsData = state[param];
   watch(state, param, () => {
     const lastId = feedsData.length - 1;
-    const lastFeed = feedsData[lastId];
-
-    const { path, title, description } = lastFeed;
+    const newFeed = feedsData[lastId];
+    const newPath = state.paths[lastId];
+    const { title, description } = newFeed;
     const rssFlowContainer = doc.createElement('a');
     const postsContainer = doc.createElement('div');
 
     rssFlowContainer.setAttribute('class', 'list-group-item list-group-item-action flex-column rss-flow');
-    rssFlowContainer.setAttribute('data-path', path);
-    postsContainer.setAttribute('data-path', path);
+    rssFlowContainer.setAttribute('data-path', newPath);
+    postsContainer.setAttribute('data-path', newPath);
 
     rssListContainer.append(rssFlowContainer);
     postListContainer.append(postsContainer);
@@ -55,7 +55,7 @@ export const feedWatcher = (state, param, doc) => {
         <span class="badge badge-light"></span>
       </div>
       <p class="mb-1">${description}</p>`;
-    showActivePosts(path, postListContainer, 'div[data-path]');
+    showActivePosts(newPath, postListContainer, 'div[data-path]');
     inputRssElement.value = '';
   });
 };
