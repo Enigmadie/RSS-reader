@@ -1,7 +1,6 @@
 import { watch } from 'melanke-watchjs';
 import {
   showActivePosts,
-  getSelectorContent,
 } from './utils';
 
 export const modeWatcher = (state, param, doc) => {
@@ -20,10 +19,9 @@ export const modeWatcher = (state, param, doc) => {
       },
       [switchPostId]: () => showActivePosts(state.newActiveRssPath, postListContainer, 'div[data-path]'),
       modal: () => {
-        const modalTitleContent = getSelectorContent(state.modalElement, '.post-title');
-        const modalBodyContent = getSelectorContent(state.modalElement, '.post-description');
-        modalTitleElement.textContent = modalTitleContent;
-        modalBodyElement.textContent = modalBodyContent;
+        const { title, description } = state.modalData;
+        modalTitleElement.textContent = title;
+        modalBodyElement.textContent = description;
       },
     };
     modeActions[state.mode]();

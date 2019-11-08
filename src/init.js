@@ -51,7 +51,7 @@ export default () => {
     paths: [],
     errorMessage: '',
     inputValue: '',
-    modalElement: null,
+    modalData: {},
     newActiveRssPath: '',
     delay: 5000,
   };
@@ -114,7 +114,12 @@ export default () => {
   postListContainer.addEventListener('click', ({ target }) => {
     if (target.hasAttribute('data-toggle')) {
       const targetPostContainer = target.parentElement;
-      state.modalElement = targetPostContainer;
+      const targetPostTitle = getSelectorContent(targetPostContainer, '.post-title');
+      const targetPostDescription = getSelectorContent(targetPostContainer, '.post-description');
+      state.modalData = {
+        title: targetPostTitle,
+        description: targetPostDescription,
+      };
       state.mode = 'modal';
     }
   });
