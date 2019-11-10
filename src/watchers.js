@@ -1,7 +1,5 @@
 import { watch } from 'melanke-watchjs';
-import {
-  showActivePosts,
-} from './utils';
+import { showActivePosts } from './utils';
 
 export const modeWatcher = (state, param, doc) => {
   const alertElement = doc.querySelector('.alert');
@@ -10,14 +8,14 @@ export const modeWatcher = (state, param, doc) => {
   const modalTitleElement = doc.querySelector('.modal-title');
 
   return watch(state, param, () => {
-    const switchPostId = `switchedToRssId${state.newActiveRssPath}`;
+    const switchingPath = `switchingTo${state.newActiveRssPath}`;
     const modeActions = {
-      view: () => alertElement.setAttribute('class', 'alert alert-danger d-none'),
+      valid: () => alertElement.setAttribute('class', 'alert alert-danger d-none'),
       invalid: () => {
         alertElement.setAttribute('class', 'alert alert-danger mb-0');
         alertElement.textContent = state.errorMessage;
       },
-      [switchPostId]: () => showActivePosts(state.newActiveRssPath, postListContainer, 'div[data-path]'),
+      [switchingPath]: () => showActivePosts(state.newActiveRssPath, postListContainer, 'div[data-path]'),
       modal: () => {
         const { title, description } = state.modalData;
         modalTitleElement.textContent = title;
@@ -32,11 +30,11 @@ export const feedWatcher = (state, param, doc) => {
   const rssListContainer = doc.querySelector('.rss-flow-group');
   const postListContainer = doc.querySelector('.posts-group');
   const inputRssElement = doc.querySelector('.form-control');
-  const feedsData = state[param];
+  const { feedsData, paths } = state;
   watch(state, param, () => {
     const lastId = feedsData.length - 1;
     const newFeed = feedsData[lastId];
-    const newPath = state.paths[lastId];
+    const newPath = paths[lastId];
     const { title, description } = newFeed;
     const rssFlowContainer = doc.createElement('a');
     const postsContainer = doc.createElement('div');

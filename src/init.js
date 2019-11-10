@@ -6,12 +6,12 @@ import axios from 'axios';
 import { union, differenceBy } from 'lodash';
 import i18next from 'i18next';
 import { modeWatcher, feedWatcher, postWatcher } from './watchers';
+import translation from './translation';
 import {
   getSelectorContent,
-  getXmlContent,
+  getParsedContent,
   buildPath,
   isValid,
-  getPostsData,
 } from './utils';
 
 
@@ -27,17 +27,12 @@ export default () => {
     debug: true,
     resources: {
       en: {
-        translation: {
-          inaccessible: 'The address is inaccessible',
-          inaccessibleLater: 'One or more addresses became inaccessible',
-          network: 'Your device lost its internet connection',
-          invalid: 'The address is not valid',
-        },
+        translation,
       },
     },
   });
   const state = {
-    mode: 'view',
+    mode: 'valid',
     updateDataProcess: new StateMachine({
       init: 'init',
       transitions: [
@@ -62,9 +57,8 @@ export default () => {
     paths.map((path, id) => axios.get(path)
       .then((res) => {
         const pathData = state.postsData[id];
-        const xmlContent = getXmlContent(res.data);
-        const xmlItems = xmlContent.querySelectorAll('item');
-        const posts = getPostsData(xmlItems, 'title', 'description');
+        const parsedContent = getParsedContent(res.data);
+        const { posts } = parsedContent;
         const newPosts = differenceBy(posts, pathData.posts, 'title');
         if (newPosts.length > 0) {
           pathData.posts = union(pathData.posts, newPosts);
@@ -99,7 +93,7 @@ export default () => {
       state.mode = 'invalid';
       state.errorMessage = i18next.t('invalid');
     } else {
-      state.mode = 'view';
+      state.mode = 'valid';
       state.inputValue = target.value;
     }
   });
@@ -108,7 +102,7 @@ export default () => {
     const targetRssFlow = target.closest('.rss-flow');
     const targetRssFlowPath = targetRssFlow.dataset.path;
     state.newActiveRssPath = targetRssFlowPath;
-    state.mode = `switchedToRssId${targetRssFlowPath}`;
+    state.mode = `switchingTo${targetRssFlowPath}`;
   });
 
   postListContainer.addEventListener('click', ({ target }) => {
@@ -125,19 +119,16 @@ export default () => {
   });
 
   modalFadeElement.addEventListener('click', () => {
-    state.mode = 'view';
+    state.mode = 'valid';
   });
 
   formElement.addEventListener('submit', (e) => {
     e.preventDefault();
-    state.mode = 'view';
+    state.mode = 'valid';
     const path = buildPath(state.inputValue);
     axios.get(path).then(({ data }) => {
-      const xmlContent = getXmlContent(data);
-      const xmlItems = xmlContent.querySelectorAll('item');
-      const title = getSelectorContent(xmlContent, 'title');
-      const description = getSelectorContent(xmlContent, 'description');
-      const posts = getPostsData(xmlItems, 'title', 'description');
+      const parsedContent = getParsedContent(data);
+      const { title, description, posts } = parsedContent;
       state.paths.push(path);
       state.feedsData.push({
         title,

@@ -15,9 +15,14 @@ export const getPostsData = (el, firstSelector, secondSelector) => {
   return result;
 };
 
-export const getXmlContent = (data) => {
+export const getParsedContent = (data) => {
   const domparser = new DOMParser();
-  return domparser.parseFromString(data, 'text/xml');
+  const xmlContent = domparser.parseFromString(data, 'text/xml');
+  const title = getSelectorContent(xmlContent, 'title');
+  const description = getSelectorContent(xmlContent, 'description');
+  const xmlItems = xmlContent.querySelectorAll('item');
+  const posts = getPostsData(xmlItems, 'title', 'description');
+  return { title, description, posts };
 };
 
 export const buildPath = (path) => `https://cors-anywhere.herokuapp.com/${path}`;
