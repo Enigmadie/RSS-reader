@@ -4,12 +4,16 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import StateMachine from 'javascript-state-machine';
 import axios from 'axios';
 import { union, differenceBy } from 'lodash';
-import i18next from 'i18next';
-import { modeWatcher, feedWatcher, postWatcher } from './watchers';
-import translation from './translation';
+import {
+  modeWatcher,
+  feedWatcher,
+  postWatcher,
+  validationWatcher,
+  activePathWathcer,
+} from './watchers';
 import {
   getSelectorContent,
-  getParsedContent,
+  parseRss,
   buildPath,
   isValid,
 } from './utils';
@@ -22,17 +26,9 @@ export default () => {
   const postListContainer = document.querySelector('.posts-group');
   const modalFadeElement = document.querySelector('.fade');
 
-  i18next.init({
-    lng: 'en',
-    debug: true,
-    resources: {
-      en: {
-        translation,
-      },
-    },
-  });
   const state = {
-    mode: 'valid',
+    mode: 'base',
+    validationState: 'valid',
     updateDataProcess: new StateMachine({
       init: 'init',
       transitions: [
@@ -44,21 +40,22 @@ export default () => {
     feedsData: [],
     postsData: [],
     paths: [],
-    errorMessage: '',
+    errorType: '',
     inputValue: '',
     modalData: {},
-    newActiveRssPath: '',
-    delay: 5000,
+    activeRssPath: '',
   };
 
   const updatePathData = (paths) => {
     const lastId = paths.length - 1;
+    const defaultDelay = 5000;
+    const lostConnectionDelay = 30000;
     state.updateDataProcess.upload();
     paths.map((path, id) => axios.get(path)
       .then((res) => {
         const pathData = state.postsData[id];
-        const parsedContent = getParsedContent(res.data);
-        const { posts } = parsedContent;
+        const rssContent = parseRss(res.data);
+        const { posts } = rssContent;
         const newPosts = differenceBy(posts, pathData.posts, 'title');
         if (newPosts.length > 0) {
           pathData.posts = union(pathData.posts, newPosts);
@@ -70,30 +67,32 @@ export default () => {
         }
         if (id === lastId) {
           state.updateDataProcess.check();
-          setTimeout(() => updatePathData(state.paths), state.delay);
+          setTimeout(() => updatePathData(state.paths), defaultDelay);
         }
       }).catch(() => {
         const hasConnection = navigator.onLine;
-        state.mode = 'invalid';
+        state.validationState = 'invalid';
         if (!hasConnection) {
-          state.errorMessage = i18next.t('network');
-          state.delay = 30000;
+          state.errorType = 'network';
+          setTimeout(() => updatePathData(state.paths), lostConnectionDelay);
         } else {
-          state.errorMessage = i18next.t('inaccessibleLater');
+          state.errorType = 'inaccessibleLater';
         }
       }));
   };
 
-  modeWatcher(state, ['mode', 'errorMessage'], document);
+  modeWatcher(state, 'mode', document);
+  validationWatcher(state, ['validationState', 'errorType'], document);
   feedWatcher(state, 'feedsData', document);
   postWatcher(state, 'state', document);
+  activePathWathcer(state, 'activeRssPath', document);
 
   inputRssElement.addEventListener('input', ({ target }) => {
     if (!isValid(target.value, state.paths)) {
-      state.mode = 'invalid';
-      state.errorMessage = i18next.t('invalid');
+      state.validationState = 'invalid';
+      state.errorType = 'invalid';
     } else {
-      state.mode = 'valid';
+      state.validationState = 'valid';
       state.inputValue = target.value;
     }
   });
@@ -101,8 +100,7 @@ export default () => {
   rssListContainer.addEventListener('click', ({ target }) => {
     const targetRssFlow = target.closest('.rss-flow');
     const targetRssFlowPath = targetRssFlow.dataset.path;
-    state.newActiveRssPath = targetRssFlowPath;
-    state.mode = `switchingTo${targetRssFlowPath}`;
+    state.activeRssPath = targetRssFlowPath;
   });
 
   postListContainer.addEventListener('click', ({ target }) => {
@@ -119,16 +117,16 @@ export default () => {
   });
 
   modalFadeElement.addEventListener('click', () => {
-    state.mode = 'valid';
+    state.mode = 'base';
   });
 
   formElement.addEventListener('submit', (e) => {
     e.preventDefault();
-    state.mode = 'valid';
     const path = buildPath(state.inputValue);
+    state.inputValue = '';
     axios.get(path).then(({ data }) => {
-      const parsedContent = getParsedContent(data);
-      const { title, description, posts } = parsedContent;
+      const rssContent = parseRss(data);
+      const { title, description, posts } = rssContent;
       state.paths.push(path);
       state.feedsData.push({
         title,
@@ -143,8 +141,8 @@ export default () => {
         updatePathData(state.paths);
       }
     }).catch(() => {
-      state.mode = 'invalid';
-      state.errorMessage = i18next.t('inaccessible');
+      state.validationState = 'invalid';
+      state.errorType = 'inaccessible';
     });
   });
 };

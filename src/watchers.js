@@ -1,28 +1,53 @@
 import { watch } from 'melanke-watchjs';
+import i18next from 'i18next';
+import translation from './translation';
 import { showActivePosts } from './utils';
 
-export const modeWatcher = (state, param, doc) => {
-  const alertElement = doc.querySelector('.alert');
+export const activePathWathcer = (state, param, doc) => {
   const postListContainer = doc.querySelector('.posts-group');
+  return watch(state, param, () => {
+    showActivePosts(state.activeRssPath, postListContainer, 'div[data-path]');
+  });
+};
+
+export const modeWatcher = (state, param, doc) => {
   const modalBodyElement = doc.querySelector('.modal-body');
   const modalTitleElement = doc.querySelector('.modal-title');
-
   return watch(state, param, () => {
-    const switchingPath = `switchingTo${state.newActiveRssPath}`;
-    const modeActions = {
-      valid: () => alertElement.setAttribute('class', 'alert alert-danger d-none'),
+    if (state.mode === 'modal') {
+      const { title, description } = state.modalData;
+      modalTitleElement.textContent = title;
+      modalBodyElement.textContent = description;
+    }
+  });
+};
+
+export const validationWatcher = (state, param, doc) => {
+  const alertElement = doc.querySelector('.alert');
+  const submitElement = doc.querySelector('.btn-news');
+  i18next.init({
+    lng: 'en',
+    debug: true,
+    resources: {
+      en: {
+        translation,
+      },
+    },
+  });
+  return watch(state, param, () => {
+    const errorMessage = i18next.t(state.errorType);
+    const validationActions = {
+      valid: () => {
+        alertElement.setAttribute('class', 'alert alert-danger d-none');
+        submitElement.removeAttribute('disabled');
+      },
       invalid: () => {
         alertElement.setAttribute('class', 'alert alert-danger mb-0');
-        alertElement.textContent = state.errorMessage;
-      },
-      [switchingPath]: () => showActivePosts(state.newActiveRssPath, postListContainer, 'div[data-path]'),
-      modal: () => {
-        const { title, description } = state.modalData;
-        modalTitleElement.textContent = title;
-        modalBodyElement.textContent = description;
+        alertElement.textContent = errorMessage;
+        submitElement.setAttribute('disabled', '');
       },
     };
-    modeActions[state.mode]();
+    validationActions[state.validationState]();
   });
 };
 

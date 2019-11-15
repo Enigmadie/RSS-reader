@@ -2,26 +2,21 @@ import { isURL, isIn } from 'validator';
 
 export const getSelectorContent = (el, selector, prop = 'textContent') => el.querySelector(selector)[prop];
 
-export const getPostsData = (el, firstSelector, secondSelector) => {
-  const result = [];
-  el.forEach((item) => {
-    const firstSelectorData = getSelectorContent(item, firstSelector);
-    const secondSelectorData = getSelectorContent(item, secondSelector);
-    result.push({
-      [firstSelector]: firstSelectorData,
-      [secondSelector]: secondSelectorData,
-    });
-  });
-  return result;
-};
-
-export const getParsedContent = (data) => {
+export const parseRss = (data) => {
   const domparser = new DOMParser();
   const xmlContent = domparser.parseFromString(data, 'text/xml');
   const title = getSelectorContent(xmlContent, 'title');
   const description = getSelectorContent(xmlContent, 'description');
   const xmlItems = xmlContent.querySelectorAll('item');
-  const posts = getPostsData(xmlItems, 'title', 'description');
+  const posts = [];
+  xmlItems.forEach((item) => {
+    const itemTitle = getSelectorContent(item, 'title');
+    const itemDescription = getSelectorContent(item, 'description');
+    posts.push({
+      title: itemTitle,
+      description: itemDescription,
+    });
+  });
   return { title, description, posts };
 };
 
