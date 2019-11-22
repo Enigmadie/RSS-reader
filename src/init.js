@@ -1,106 +1,92 @@
 import '@babel/polyfill';
 import 'bootstrap/js/dist/modal';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import StateMachine from 'javascript-state-machine';
 import axios from 'axios';
+import i18next from 'i18next';
 import { union, differenceBy } from 'lodash';
+import { isURL, isIn as isDuplicate } from 'validator';
+import translation from './translation';
 import {
   modeWatcher,
   feedWatcher,
   postWatcher,
   validationWatcher,
-  activePathWathcer,
+  uploadingFeedWatcher,
 } from './watchers';
 import {
   getSelectorContent,
   parseRss,
   buildPath,
-  isValid,
 } from './utils';
 
 
 export default () => {
   const inputRssElement = document.querySelector('.form-control');
   const formElement = document.querySelector('form');
-  const rssListContainer = document.querySelector('.rss-flow-group');
   const postListContainer = document.querySelector('.posts-group');
   const modalFadeElement = document.querySelector('.fade');
 
+  i18next.init({
+    lng: 'en',
+    debug: true,
+    resources: {
+      en: {
+        translation,
+      },
+    },
+  });
+
   const state = {
     mode: 'base',
+    uploadingFeedProcess: 'watching',
     validationState: 'valid',
-    updateDataProcess: new StateMachine({
-      init: 'init',
-      transitions: [
-        { name: 'upload', from: ['init', 'checked', 'observed'], to: 'uploaded' },
-        { name: 'check', from: 'uploaded', to: 'checked' },
-        { name: 'error', from: 'uploaded', to: 'observed' },
-      ],
-    }),
     feedsData: [],
     postsData: [],
     paths: [],
     errorType: '',
     inputValue: '',
     modalData: {},
-    activeRssPath: '',
   };
 
   const updatePathData = (paths) => {
     const lastId = paths.length - 1;
     const defaultDelay = 5000;
-    const lostConnectionDelay = 30000;
-    state.updateDataProcess.upload();
     paths.map((path, id) => axios.get(path)
       .then((res) => {
-        const pathData = state.postsData[id];
         const rssContent = parseRss(res.data);
         const { posts } = rssContent;
-        const newPosts = differenceBy(posts, pathData.posts, 'title');
+        const newPosts = differenceBy(posts, state.postsData, 'title');
         if (newPosts.length > 0) {
-          pathData.posts = union(pathData.posts, newPosts);
-          pathData.newPosts = newPosts;
-          pathData.hasNewItems = true;
-        } else {
-          pathData.hasNewItems = false;
-          pathData.newPosts = [];
+          state.postsData = union(state.postsData, newPosts);
         }
         if (id === lastId) {
-          state.updateDataProcess.check();
           setTimeout(() => updatePathData(state.paths), defaultDelay);
         }
       }).catch(() => {
-        const hasConnection = navigator.onLine;
         state.validationState = 'invalid';
-        if (!hasConnection) {
-          state.errorType = 'network';
-          setTimeout(() => updatePathData(state.paths), lostConnectionDelay);
-        } else {
-          state.errorType = 'inaccessibleLater';
-        }
+        state.errorType = 'network';
       }));
   };
 
   modeWatcher(state, 'mode', document);
-  validationWatcher(state, ['validationState', 'errorType'], document);
+  validationWatcher(state, ['validationState', 'errorType'], document, i18next);
   feedWatcher(state, 'feedsData', document);
-  postWatcher(state, 'state', document);
-  activePathWathcer(state, 'activeRssPath', document);
+  postWatcher(state, 'postsData', document);
+  uploadingFeedWatcher(state, 'uploadingFeedProcess', document);
 
   inputRssElement.addEventListener('input', ({ target }) => {
-    if (!isValid(target.value, state.paths)) {
+    const { paths } = state;
+    const targetPath = buildPath(target.value);
+    state.inputValue = target.value;
+    if (!isURL(target.value)) {
       state.validationState = 'invalid';
       state.errorType = 'invalid';
+    } else if (isDuplicate(targetPath, paths)) {
+      state.validationState = 'invalid';
+      state.errorType = 'duplicate';
     } else {
       state.validationState = 'valid';
-      state.inputValue = target.value;
     }
-  });
-
-  rssListContainer.addEventListener('click', ({ target }) => {
-    const targetRssFlow = target.closest('.rss-flow');
-    const targetRssFlowPath = targetRssFlow.dataset.path;
-    state.activeRssPath = targetRssFlowPath;
   });
 
   postListContainer.addEventListener('click', ({ target }) => {
@@ -121,25 +107,23 @@ export default () => {
   });
 
   formElement.addEventListener('submit', (e) => {
+    state.uploadingFeedProcess = 'uploading';
     e.preventDefault();
     const path = buildPath(state.inputValue);
-    state.inputValue = '';
     axios.get(path).then(({ data }) => {
-      const rssContent = parseRss(data);
-      const { title, description, posts } = rssContent;
       state.paths.push(path);
+      const currentFeedId = state.feedsData.length;
+      const rssContent = parseRss(data, currentFeedId);
+      const { title, description, posts } = rssContent;
       state.feedsData.push({
+        id: currentFeedId,
         title,
         description,
       });
-      state.postsData.push({
-        hasNewItems: true,
-        posts,
-        newPosts: posts,
-      });
-      if (state.updateDataProcess.state === 'init') {
-        updatePathData(state.paths);
-      }
+      state.uploadingFeedProcess = 'watching';
+      const newPosts = differenceBy(posts, state.postsData, 'title');
+      state.postsData = union(state.postsData, newPosts);
+      updatePathData(state.paths);
     }).catch(() => {
       state.validationState = 'invalid';
       state.errorType = 'inaccessible';
