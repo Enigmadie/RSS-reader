@@ -1,6 +1,9 @@
+import uuid from 'uuid-js';
+
 export const getSelectorContent = (el, selector, prop = 'textContent') => el.querySelector(selector)[prop];
 
-export const parseRss = (data, id) => {
+export const parseRss = (data) => {
+  const id = uuid.create().toString();
   const domparser = new DOMParser();
   const xmlContent = domparser.parseFromString(data, 'text/xml');
   const title = getSelectorContent(xmlContent, 'title');
@@ -17,7 +20,12 @@ export const parseRss = (data, id) => {
       description: itemDescription,
     });
   });
-  return { title, description, posts };
+  return {
+    id,
+    title,
+    description,
+    posts,
+  };
 };
 
 export const buildPath = (path) => `https://cors-anywhere.herokuapp.com/${path}`;

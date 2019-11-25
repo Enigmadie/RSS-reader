@@ -112,11 +112,15 @@ export default () => {
     const path = buildPath(state.inputValue);
     axios.get(path).then(({ data }) => {
       state.paths.push(path);
-      const currentFeedId = state.feedsData.length;
-      const rssContent = parseRss(data, currentFeedId);
-      const { title, description, posts } = rssContent;
+      const rssContent = parseRss(data);
+      const {
+        id,
+        title,
+        description,
+        posts,
+      } = rssContent;
       state.feedsData.push({
-        id: currentFeedId,
+        id,
         title,
         description,
       });
