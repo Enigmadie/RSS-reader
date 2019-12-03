@@ -3,7 +3,7 @@ import 'bootstrap/js/dist/modal';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
 import i18next from 'i18next';
-import { union, differenceBy, has } from 'lodash';
+import { union, differenceBy, assign } from 'lodash';
 import { isURL, isIn as isDuplicate } from 'validator';
 import translation from './translation';
 import {
@@ -55,12 +55,10 @@ export default () => {
       .then((res) => {
         const rssContent = parseRss(res.data);
         const { posts } = rssContent;
-        const newPosts = differenceBy(posts, state.postsData, 'title');
+        const newPosts = differenceBy(posts, state.postsData, 'title')
+          .map((item) => assign(item, { feedId: id }));
         if (newPosts.length > 0) {
-          state.postsData = union(state.postsData, newPosts)
-            .map((item, itemId) => (has(item, 'feedId')
-              ? item
-              : { ...item, id: itemId, feedId: id }));
+          state.postsData = union(state.postsData, newPosts);
         }
         if (id === lastId) {
           setTimeout(() => updatePathData(state.paths), defaultDelay);
@@ -124,11 +122,9 @@ export default () => {
         description,
       });
       state.uploadingFeedProcess = 'watching';
-      const newPosts = differenceBy(posts, state.postsData, 'title');
-      state.postsData = union(state.postsData, newPosts)
-        .map((item, id) => (has(item, 'feedId')
-          ? item
-          : { ...item, id, feedId: currentFeedId }));
+      const newPosts = differenceBy(posts, state.postsData, 'title')
+        .map((item) => assign(item, { feedId: currentFeedId }));
+      state.postsData = union(state.postsData, newPosts);
       updatePathData(state.paths);
     }).catch(() => {
       state.validationState = 'invalid';
